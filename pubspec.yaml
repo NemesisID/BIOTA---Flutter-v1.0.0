@@ -23,6 +23,9 @@ dependencies:
   flutter_map: ^6.1.0
   latlong2: ^0.9.1
   google_fonts: ^6.1.0
+  permission_handler: ^11.1.0
+  http: ^1.1.0
+  cached_network_image: ^3.3.0
 
 dev_dependencies:
   flutter_test:

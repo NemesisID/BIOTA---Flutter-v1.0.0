@@ -399,79 +399,82 @@ class _ExploreScreenState extends State<ExploreScreen> {
     );
   }
 
+  Widget _buildMapView() {
+    return FlutterMap(
+      mapController: _mapController,
+      options: MapOptions(
+        initialCenter: _currentCenter,
+        initialZoom: _currentZoom,
+        minZoom: 5.0,
+        maxZoom: 18.0,
+        onMapReady: () {
+          print('Map is ready');
+        },
+        onTap: (tapPosition, point) {
+          _showLocationDialog(point);
+        },
+      ),
+      children: [
+        // Tile Layer dengan fallback
+        TileLayer(
+          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          userAgentPackageName: 'com.example.biota_2',
+          maxZoom: 18,
+          errorTileCallback: (tile, error, stackTrace) {
+            print('Tile loading error: $error');
+          },
+          fallbackUrl: 'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        ),
+        
+        // Current Location Marker - Updated to simple blue circle
+        if (_currentPosition != null)
+          MarkerLayer(
+            markers: [
+              Marker(
+                point: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+                width: 20,
+                height: 20,
+                child: Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: Colors.blue,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white,
+                      width: 3,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.2),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+        // Species Markers
+        MarkerLayer(
+          markers: _speciesList
+              .where((species) => species.latitude != null && species.longitude != null)
+              .map((species) => _buildSpeciesMarker(species))
+              .toList(),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Stack(
         children: [
           // Map
-          FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              center: _currentCenter,
-              zoom: _currentZoom,
-              minZoom: 3.0,
-              maxZoom: 18.0,
-              onMapReady: () {
-                if (_currentPosition != null) {
-                  _mapController.move(
-                    LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
-                    12.0,
-                  );
-                }
-              },
-            ),
-            children: [
-              // Tile layer
-              TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.example.biota_2',
-              ),
-              
-              // Species markers
-              MarkerLayer(
-                markers: _speciesList.map((species) {
-                  return Marker(
-                    width: 60,
-                    height: 60,
-                    point: LatLng(species.latitude!, species.longitude!),
-                    child: _buildSpeciesMarker(species),
-                  );
-                }).toList(),
-              ),
-              
-              // Current location marker
-              if (_currentPosition != null)
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      width: 40,
-                      height: 40,
-                      point: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.blue,
-                          border: Border.all(color: Colors.white, width: 3),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.3),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.my_location,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-            ],
-          ),
+          _buildMapView(),
           
           // Loading overlay
           if (_isLoading)

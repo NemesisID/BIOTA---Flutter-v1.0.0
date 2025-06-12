@@ -64,6 +64,7 @@ class AboutAppScreen extends StatelessWidget {
                           color: Colors.white70,
                         ),
                       ),
+                      const SizedBox(height: 24),
                     ],
                   ),
                 ),
@@ -587,7 +588,7 @@ class AboutAppScreen extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Dibuat Dengan ❤️ Untuk Indonesia\'s Biodiversity',
+            'Dibuat dengan ❤️ untuk flora & fauna di Indonesia',
             style: TextStyle(
               fontSize: 12,
               color: Colors.grey[600],

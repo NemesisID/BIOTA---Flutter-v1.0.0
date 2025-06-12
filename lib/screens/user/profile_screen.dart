@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as path;
 import 'package:biota_2/constants/colors.dart';
 import 'package:biota_2/models/user.dart';
 import 'package:biota_2/services/database_helper.dart';
 import 'package:biota_2/screens/auth/login_screen.dart';
 import 'package:biota_2/screens/user/edit_profile_screen.dart';
 import 'package:biota_2/screens/user/contribution_history_screen.dart';
-import 'package:biota_2/screens/user/about_app_screen.dart'; // Tambahkan import ini
+import 'package:biota_2/screens/user/about_app_screen.dart';
+import 'package:biota_2/widgets/image_crop_widget.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -18,6 +23,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   User? _currentUser;
   bool _isLoading = true;
+  bool _isUpdatingPhoto = false;
 
   @override
   void initState() {
@@ -90,6 +96,236 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _changeProfilePhoto() async {
+    if (_currentUser == null) return;
+
+    try {
+      // Show image source selection dialog
+      final ImageSource? source = await _showImageSourceDialog();
+      if (source == null) return;
+
+      setState(() {
+        _isUpdatingPhoto = true;
+      });
+
+      // Pick image
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: source,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 85,
+      );
+
+      if (image == null) {
+        setState(() {
+          _isUpdatingPhoto = false;
+        });
+        return;
+      }
+
+      // Show crop screen
+      final File imageFile = File(image.path);
+      final croppedImageBytes = await Navigator.push<List<int>>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ImageCropWidget(
+            imageFile: imageFile,
+            onCropped: (croppedBytes) {
+              Navigator.pop(context, croppedBytes);
+            },
+          ),
+        ),
+      );
+
+      if (croppedImageBytes == null) {
+        setState(() {
+          _isUpdatingPhoto = false;
+        });
+        return;
+      }
+
+      // Save cropped image to local storage
+      final String? savedImagePath = await _saveImageToLocal(croppedImageBytes);
+      
+      if (savedImagePath != null) {
+        // Update user profile with new image path
+        final updatedUser = _currentUser!.copyWith(
+          profileImagePath: savedImagePath,
+        );
+
+        final result = await DatabaseHelper.instance.updateUserProfile(updatedUser);
+        
+        if (result > 0) {
+          // Update SharedPreferences
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('profile_image_path', savedImagePath);
+          
+          // Update local state
+          setState(() {
+            _currentUser = updatedUser;
+          });
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Foto profil berhasil diperbarui'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+        } else {
+          throw Exception('Gagal memperbarui foto profil di database');
+        }
+      } else {
+        throw Exception('Gagal menyimpan foto profil');
+      }
+
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUpdatingPhoto = false;
+        });
+      }
+    }
+  }
+
+  Future<ImageSource?> _showImageSourceDialog() async {
+    return showDialog<ImageSource>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Pilih Sumber Foto'),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.camera_alt, color: AppColors.primary),
+                title: const Text('Kamera'),
+                onTap: () => Navigator.of(context).pop(ImageSource.camera),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library, color: AppColors.primary),
+                title: const Text('Galeri'),
+                onTap: () => Navigator.of(context).pop(ImageSource.gallery),
+              ),
+              if (_currentUser?.profileImagePath != null)
+                ListTile(
+                  leading: const Icon(Icons.delete, color: Colors.red),
+                  title: const Text('Hapus Foto'),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _removeProfilePhoto();
+                  },
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<String?> _saveImageToLocal(List<int> imageBytes) async {
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      final profileDir = Directory(path.join(appDir.path, 'profile_images'));
+      
+      if (!await profileDir.exists()) {
+        await profileDir.create(recursive: true);
+      }
+      
+      // Delete old profile image if exists
+      if (_currentUser?.profileImagePath != null) {
+        final oldFile = File(_currentUser!.profileImagePath!);
+        if (await oldFile.exists()) {
+          await oldFile.delete();
+        }
+      }
+      
+      final fileName = 'profile_${_currentUser!.id}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final file = File(path.join(profileDir.path, fileName));
+      
+      await file.writeAsBytes(imageBytes);
+      return file.path;
+    } catch (e) {
+      print('Error saving image: $e');
+      return null;
+    }
+  }
+
+  Future<void> _removeProfilePhoto() async {
+    if (_currentUser == null) return;
+
+    try {
+      setState(() {
+        _isUpdatingPhoto = true;
+      });
+
+      // Delete image file if exists
+      if (_currentUser!.profileImagePath != null) {
+        final imageFile = File(_currentUser!.profileImagePath!);
+        if (await imageFile.exists()) {
+          await imageFile.delete();
+        }
+      }
+
+      // Update user profile
+      final updatedUser = _currentUser!.copyWith(
+        profileImagePath: null,
+      );
+
+      final result = await DatabaseHelper.instance.updateUserProfile(updatedUser);
+      
+      if (result > 0) {
+        // Update SharedPreferences
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('profile_image_path');
+        
+        // Update local state
+        setState(() {
+          _currentUser = updatedUser;
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Foto profil berhasil dihapus'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        throw Exception('Gagal menghapus foto profil dari database');
+      }
+
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUpdatingPhoto = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -124,31 +360,72 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 padding: const EdgeInsets.all(24.0),
                 child: Column(
                   children: [
-                    // Profile Picture
-                    CircleAvatar(
-                      radius: 60,
-                      backgroundColor: Colors.white,
-                      child: _currentUser!.profileImagePath != null
-                          ? ClipOval(
-                              child: Image.asset(
-                                _currentUser!.profileImagePath!,
-                                width: 120,
-                                height: 120,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Icon(
-                                    Icons.person,
-                                    size: 60,
-                                    color: AppColors.primary,
-                                  );
-                                },
+                    // Profile Picture with Change Button
+                    Stack(
+                      children: [
+                        CircleAvatar(
+                          radius: 60,
+                          backgroundColor: Colors.white,
+                          child: _currentUser!.profileImagePath != null
+                              ? ClipOval(
+                                  child: Image.file(
+                                    File(_currentUser!.profileImagePath!),
+                                    width: 120,
+                                    height: 120,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Icon(
+                                        Icons.person,
+                                        size: 60,
+                                        color: AppColors.primary,
+                                      );
+                                    },
+                                  ),
+                                )
+                              : Icon(
+                                  Icons.person,
+                                  size: 60,
+                                  color: AppColors.primary,
+                                ),
+                        ),
+                        // Change Photo Button
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: GestureDetector(
+                            onTap: _isUpdatingPhoto ? null : _changeProfilePhoto,
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: AppColors.accent,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 2),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.2),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
                               ),
-                            )
-                          : Icon(
-                              Icons.person,
-                              size: 60,
-                              color: AppColors.primary,
+                              child: _isUpdatingPhoto
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        color: Colors.white,
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(
+                                      Icons.camera_alt,
+                                      color: Colors.white,
+                                      size: 16,
+                                    ),
                             ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 16),
                     // User Name

@@ -7,42 +7,49 @@ plugins {
 android {
     namespace = "com.example.biota_2"
     compileSdk = 35
-
+    
     compileOptions {
-        isCoreLibraryDesugaringEnabled = true
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
     }
-
+    
     kotlinOptions {
-        jvmTarget = "17"
+        jvmTarget = "11"
     }
-
+    
     defaultConfig {
         applicationId = "com.example.biota_2"
-        minSdk = 23  // Naikkan minimum SDK
-        targetSdk = 35  // Samakan dengan compileSdk
+        minSdk = 21
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0"
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        multiDexEnabled = true
     }
-
+    
     buildTypes {
         release {
+            // Disable minifikasi untuk debug
+            isMinifyEnabled = false
+            isShrinkResources = false
             signingConfig = signingConfigs.getByName("debug")
         }
+        debug {
+            isMinifyEnabled = false
+            isShrinkResources = false
+            isDebuggable = true
+        }
     }
-
-    ndkVersion = "27.0.12077973"
-    lintOptions {
-        disable("ObsoleteSdkInt")
+    
+    // Tambahkan untuk memory management
+    dexOptions {
+        javaMaxHeapSize = "4g"
     }
-}
-
-dependencies {
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 }
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    implementation("androidx.multidex:multidex:2.0.1")
 }
