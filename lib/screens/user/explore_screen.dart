@@ -9,7 +9,9 @@ import 'package:biota_2/screens/user/add_species_form.dart';
 import 'dart:io';
 
 class ExploreScreen extends StatefulWidget {
-  const ExploreScreen({super.key});
+  final Data? focusSpecies;
+  
+  const ExploreScreen({super.key, this.focusSpecies});
 
   @override
   State<ExploreScreen> createState() => _ExploreScreenState();
@@ -22,7 +24,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
   List<Data> _speciesList = [];
   bool _isLoading = true;
   Position? _currentPosition;
-  LatLng _currentCenter = const LatLng(-6.2088, 106.8456); // Default Jakarta
+  LatLng _currentCenter = const LatLng(-7.2575, 112.7521); // Default Surabaya
   double _currentZoom = 10.0;
 
   @override
@@ -31,15 +33,48 @@ class _ExploreScreenState extends State<ExploreScreen> {
     _initializeMap();
   }
 
+  @override
+  void didUpdateWidget(ExploreScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.focusSpecies != null && 
+        widget.focusSpecies != oldWidget.focusSpecies) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _focusOnSpecies(widget.focusSpecies!);
+      });
+    }
+  }
+
   Future<void> _initializeMap() async {
     await _getCurrentLocation();
     await _loadSpeciesData();
+    
+    if (widget.focusSpecies != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _focusOnSpecies(widget.focusSpecies!);
+      });
+    }
+  }
+
+  void _focusOnSpecies(Data species) {
+    if (species.latitude != null && species.longitude != null) {
+      _mapController.move(
+        LatLng(species.latitude!, species.longitude!),
+        16.0,
+      );
+      
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (mounted) {
+          _showSpeciesDetail(species);
+        }
+      });
+    }
   }
 
   Future<void> _getCurrentLocation() async {
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
+        print('Location services are disabled');
         return;
       }
 
@@ -47,11 +82,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
+          print('Location permissions are denied');
           return;
         }
       }
 
       if (permission == LocationPermission.deniedForever) {
+        print('Location permissions are permanently denied');
         return;
       }
 
@@ -64,6 +101,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
           _currentPosition = position;
           _currentCenter = LatLng(position.latitude, position.longitude);
         });
+        print('Current location: ${position.latitude}, ${position.longitude}');
       }
     } catch (e) {
       print('Error getting location: $e');
@@ -72,12 +110,39 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   Future<void> _loadSpeciesData() async {
     try {
+      print('=== LOADING SPECIES DATA FROM DATABASE ===');
+      
+      // Load data dari database (termasuk dummy data yang sudah di-inject di homepage)
       final species = await _databaseHelper.getApprovedSpecies();
+      print('Total species from database: ${species.length}');
+      
+      // Debug data yang ada di database
+      for (var s in species) {
+        print('DB Species: ${s.speciesName} - Approved: ${s.isApproved} - Lat: ${s.latitude}, Lng: ${s.longitude} - Image: ${s.image}');
+      }
+      
+      // Filter species yang memiliki koordinat valid
+      final speciesWithLocation = species.where((s) => 
+        s.latitude != null && 
+        s.longitude != null &&
+        s.latitude != 0 &&
+        s.longitude != 0
+      ).toList();
+      
+      print('Species with valid coordinates: ${speciesWithLocation.length}');
+      
+      for (var s in speciesWithLocation) {
+        print('Valid Species: ${s.speciesName} at (${s.latitude}, ${s.longitude}) - Image: ${s.image}');
+      }
+      
       setState(() {
-        _speciesList = species.where((s) => s.latitude != null && s.longitude != null).toList();
+        _speciesList = speciesWithLocation;
         _isLoading = false;
       });
+      
+      print('=== SPECIES DATA LOADED SUCCESSFULLY ===');
     } catch (e) {
+      print('Error loading species data: $e');
       setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -101,21 +166,28 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 
   void _zoomIn() {
-    _mapController.move(_mapController.center, _mapController.zoom + 1);
+    double newZoom = (_mapController.zoom + 1).clamp(5.0, 18.0);
+    _mapController.move(_mapController.center, newZoom);
   }
 
   void _zoomOut() {
-    _mapController.move(_mapController.center, _mapController.zoom - 1);
+    double newZoom = (_mapController.zoom - 1).clamp(5.0, 18.0);
+    _mapController.move(_mapController.center, newZoom);
   }
 
+  // Enhanced species marker with image support
   Widget _buildSpeciesMarker(Data species) {
     return GestureDetector(
-      onTap: () => _showSpeciesDetail(species),
+      onTap: () {
+        print('Marker tapped: ${species.speciesName}');
+        _showSpeciesDetail(species);
+      },
       child: Container(
-        width: 60,
-        height: 60,
+        width: 50,
+        height: 50,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
+          color: Colors.white,
           border: Border.all(
             color: _getStatusColor(species.status),
             width: 3,
@@ -129,51 +201,129 @@ class _ExploreScreenState extends State<ExploreScreen> {
           ],
         ),
         child: ClipOval(
-          child: species.image != null && File(species.image!).existsSync()
-              ? Image.file(
-                  File(species.image!),
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return _buildDefaultMarkerIcon(species);
-                  },
-                )
-              : _buildDefaultMarkerIcon(species),
+          child: _buildMarkerImage(species),
         ),
       ),
     );
   }
 
+  // Enhanced image builder for markers - FIXED VERSION
+  Widget _buildMarkerImage(Data species) {
+    print('=== MARKER IMAGE BUILDER ===');
+    print('Species: ${species.speciesName}, Image Path: ${species.image}');
+
+    if (species.image != null && species.image!.isNotEmpty) {
+      final imagePath = species.image!;
+      
+      // Asset image (prioritas pertama untuk dummy data)
+      if (imagePath.startsWith('assets/')) {
+        print('Attempting to load ASSET for marker: $imagePath');
+        return Image.asset(
+          imagePath,
+          fit: BoxFit.cover,
+          width: 44, // Explicit width
+          height: 44, // Explicit height
+          errorBuilder: (BuildContext context, Object error, StackTrace? stackTrace) {
+            print('!!!!!! ASSET LOADING ERROR FOR MARKER !!!!!!');
+            print('Species: ${species.speciesName}');
+            print('Path: $imagePath');
+            print('Error Object Type: ${error.runtimeType}');
+            print('Error: $error');
+            // print('StackTrace: $stackTrace'); // Bisa sangat panjang, aktifkan jika perlu
+            print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
+            return _buildDefaultMarkerIcon(species); // Fallback
+          },
+        );
+      }
+      // Network image (URL)
+      else if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+        print('✓ Loading network image for marker: $imagePath');
+        return Container(
+          width: 44,
+          height: 44,
+          child: Image.network(
+            imagePath,
+            fit: BoxFit.cover,
+            loadingBuilder: (context, child, loadingProgress) {
+              if (loadingProgress == null) return child;
+              return Container(
+                decoration: BoxDecoration(
+                  color: _getStatusColor(species.status).withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      color: _getStatusColor(species.status),
+                      strokeWidth: 2,
+                    ),
+                  ),
+                ),
+              );
+            },
+            errorBuilder: (context, error, stackTrace) {
+              print('❌ Network error for marker: $imagePath - $error');
+              return _buildDefaultMarkerIcon(species);
+            },
+          ),
+        );
+      }
+      // Local file
+      else if (File(imagePath).existsSync()) {
+        print('✓ Loading file image for marker: $imagePath');
+        return Container(
+          width: 44,
+          height: 44,
+          child: Image.file(
+            File(imagePath),
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              print('❌ File error for marker: $imagePath - $error');
+              return _buildDefaultMarkerIcon(species);
+            },
+          ),
+        );
+      }
+    }
+    
+    // Fallback to default icon
+    print('Marker: No valid image path, using default icon for ${species.speciesName}');
+    return _buildDefaultMarkerIcon(species);
+  }
+
   Widget _buildDefaultMarkerIcon(Data species) {
+    print('Building default marker icon for: ${species.speciesName}');
     return Container(
-      color: _getStatusColor(species.status).withOpacity(0.1),
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: _getStatusColor(species.status).withOpacity(0.1),
+        shape: BoxShape.circle,
+      ),
       child: Icon(
         species.category.toLowerCase() == 'hewan' ? Icons.pets : Icons.eco,
         color: _getStatusColor(species.status),
-        size: 30,
+        size: 24,
       ),
     );
   }
 
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
-      case 'aman':
-      case 'tidak rentan':
+      case 'banyak':
         return Colors.green;
       case 'rentan':
         return Colors.orange;
       case 'terancam punah':
         return Colors.red;
-      case 'kritis':
-        return Colors.red.shade700;
-      case 'punah di alam liar':
-        return Colors.purple;
-      case 'punah':
-        return Colors.black;
-      default:
-        return Colors.grey;
+      default: // Pastikan ada return statement di sini
+        return Colors.grey; // Mengembalikan warna default jika status tidak dikenali
     }
   }
 
+  // Enhanced species detail with better image handling
   void _showSpeciesDetail(Data species) {
     showModalBottomSheet(
       context: context,
@@ -208,33 +358,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   ),
                   const SizedBox(height: 20),
                   
-                  // Species image
-                  if (species.image != null && File(species.image!).existsSync())
-                    Container(
-                      height: 200,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        image: DecorationImage(
-                          image: FileImage(File(species.image!)),
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    )
-                  else
-                    Container(
-                      height: 200,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        color: _getStatusColor(species.status).withOpacity(0.1),
-                      ),
-                      child: Icon(
-                        species.category.toLowerCase() == 'hewan' ? Icons.pets : Icons.eco,
-                        size: 80,
-                        color: _getStatusColor(species.status),
-                      ),
-                    ),
+                  // Enhanced species image
+                  _buildDetailImage(species),
                   
                   const SizedBox(height: 16),
                   
@@ -399,7 +524,150 @@ class _ExploreScreenState extends State<ExploreScreen> {
     );
   }
 
+  // Enhanced detail image builder - FIXED VERSION
+  Widget _buildDetailImage(Data species) {
+    print('=== DETAIL IMAGE BUILDER ===');
+    print('Species: ${species.speciesName}, Image Path: ${species.image}');
+
+    if (species.image != null && species.image!.isNotEmpty) {
+      final imagePath = species.image!;
+      
+      // Asset image (prioritas pertama untuk dummy data)
+      if (imagePath.startsWith('assets/')) {
+        print('Attempting to load ASSET for detail: $imagePath');
+        return Container( 
+            width: double.infinity,
+            height: 200,
+            child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.asset(
+                    imagePath,
+                    fit: BoxFit.cover,
+                    errorBuilder: (BuildContext context, Object error, StackTrace? stackTrace) {
+                        print('!!!!!! ASSET LOADING ERROR FOR DETAIL !!!!!!');
+                        print('Species: ${species.speciesName}');
+                        print('Path: $imagePath');
+                        print('Error Object Type: ${error.runtimeType}');
+                        print('Error: $error');
+                        // print('StackTrace: $stackTrace'); // Bisa sangat panjang, aktifkan jika perlu
+                        print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
+                        return _buildDefaultDetailImage(species); // Fallback
+                    },
+                ),
+            ),
+        );
+      }
+      // Network image (URL)
+      else if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+        print('✓ Loading network image for detail: $imagePath');
+        return Container(
+          height: 200,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            color: Colors.grey[200],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.network(
+              imagePath,
+              fit: BoxFit.cover,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return Container(
+                  decoration: BoxDecoration(
+                    color: _getStatusColor(species.status).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(
+                        color: _getStatusColor(species.status),
+                        value: loadingProgress.expectedTotalBytes != null
+                            ? loadingProgress.cumulativeBytesLoaded /
+                                loadingProgress.expectedTotalBytes!
+                            : null,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Memuat gambar...',
+                        style: TextStyle(
+                          color: _getStatusColor(species.status),
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+              errorBuilder: (context, error, stackTrace) {
+                print('❌ Network error for detail: $imagePath - $error');
+                return _buildDefaultDetailImage(species);
+              },
+            ),
+          ),
+        );
+      }
+      // Local file
+      else if (File(imagePath).existsSync()) {
+        print('✓ Loading file image for detail: $imagePath');
+        return Container(
+          height: 200,
+          width: double.infinity,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.file(
+              File(imagePath),
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                print('❌ File error for detail: $imagePath - $error');
+                return _buildDefaultDetailImage(species);
+              },
+            ),
+          ),
+        );
+      }
+    }
+    
+    // Fallback to default image
+    print('Detail: No valid image path, using default image for ${species.speciesName}');
+    return _buildDefaultDetailImage(species);
+  }
+
+  Widget _buildDefaultDetailImage(Data species) {
+    return Container(
+      height: 200,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        color: _getStatusColor(species.status).withOpacity(0.1),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            species.category.toLowerCase() == 'hewan' ? Icons.pets : Icons.eco,
+            size: 80,
+            color: _getStatusColor(species.status),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Gambar tidak tersedia',
+            style: TextStyle(
+              color: _getStatusColor(species.status),
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildMapView() {
+    print('Building map with ${_speciesList.length} species markers');
+    
     return FlutterMap(
       mapController: _mapController,
       options: MapOptions(
@@ -411,11 +679,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
           print('Map is ready');
         },
         onTap: (tapPosition, point) {
-          _showLocationDialog(point);
+          print('Map tapped at: ${point.latitude}, ${point.longitude}');
         },
       ),
       children: [
-        // Tile Layer dengan fallback
+        // Tile Layer
         TileLayer(
           urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
           userAgentPackageName: 'com.example.biota_2',
@@ -423,10 +691,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
           errorTileCallback: (tile, error, stackTrace) {
             print('Tile loading error: $error');
           },
-          fallbackUrl: 'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
         ),
         
-        // Current Location Marker - Updated to simple blue circle
+        // Current Location Marker
         if (_currentPosition != null)
           MarkerLayer(
             markers: [
@@ -457,13 +724,19 @@ class _ExploreScreenState extends State<ExploreScreen> {
             ],
           ),
 
-        // Species Markers
-        MarkerLayer(
-          markers: _speciesList
-              .where((species) => species.latitude != null && species.longitude != null)
-              .map((species) => _buildSpeciesMarker(species))
-              .toList(),
-        ),
+        // Species Markers with enhanced image support
+        if (_speciesList.isNotEmpty)
+          MarkerLayer(
+            markers: _speciesList.map((species) {
+              print('Creating marker for ${species.speciesName} at (${species.latitude}, ${species.longitude}) with image: ${species.image}');
+              return Marker(
+                point: LatLng(species.latitude!, species.longitude!),
+                width: 50,
+                height: 50,
+                child: _buildSpeciesMarker(species),
+              );
+            }).toList(),
+          ),
       ],
     );
   }
@@ -524,7 +797,27 @@ class _ExploreScreenState extends State<ExploreScreen> {
             ),
           ),
           
-          // Top right: Add species button
+          // Debug info
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 60,
+            left: 16,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.7),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                'Species: ${_speciesList.length}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ),
+          
+          // Add species button
           Positioned(
             top: MediaQuery.of(context).padding.top + 16,
             right: 16,
@@ -582,7 +875,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
             ),
           ),
           
-          // Bottom left: Current location button
+          // Bottom controls
           Positioned(
             bottom: 20,
             left: 16,
@@ -597,7 +890,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
             ),
           ),
           
-          // Bottom right: Zoom controls
           Positioned(
             bottom: 20,
             right: 16,

@@ -6,6 +6,7 @@ import 'package:biota_2/models/data.dart';
 import 'package:biota_2/models/user.dart';
 import 'package:biota_2/services/database_helper.dart';
 import 'package:biota_2/services/auth_service.dart';
+import 'package:biota_2/services/data_service.dart';
 
 class ContributionHistoryScreen extends StatefulWidget {
   const ContributionHistoryScreen({super.key});
@@ -136,25 +137,121 @@ class _ContributionHistoryScreenState extends State<ContributionHistoryScreen> {
     }
   }
 
+  // Enhanced delete confirmation with additional info
   Future<void> _showDeleteConfirmationDialog(Data contribution) async {
     return showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          title: const Text('Konfirmasi Hapus'),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          title: Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Konfirmasi Hapus',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Apakah Anda yakin ingin menghapus kontribusi "${contribution.speciesName}"?'),
-              const SizedBox(height: 8),
               Text(
-                'Tindakan ini tidak dapat dibatalkan.',
-                style: TextStyle(
-                  color: Colors.red[600],
-                  fontSize: 12,
-                  fontStyle: FontStyle.italic,
+                'Apakah Anda yakin ingin menghapus kontribusi berikut?',
+                style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+              ),
+              const SizedBox(height: 12),
+              
+              // Species info card
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: AppColors.primary.withOpacity(0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      contribution.category.toLowerCase() == 'hewan' ? Icons.pets : Icons.eco,
+                      color: AppColors.primary,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            contribution.speciesName,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          Text(
+                            contribution.latinName,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontStyle: FontStyle.italic,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: _getStatusColor(contribution.isApproved).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        _getStatusText(contribution.isApproved),
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: _getStatusColor(contribution.isApproved),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              const SizedBox(height: 12),
+              
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Colors.red.withOpacity(0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.red[700], size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Tindakan ini tidak dapat dibatalkan. Data akan dihapus secara permanen.',
+                        style: TextStyle(
+                          color: Colors.red[700],
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -162,7 +259,13 @@ class _ContributionHistoryScreenState extends State<ContributionHistoryScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Batal'),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.grey[600],
+              ),
+              child: const Text(
+                'Batal',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              ),
             ),
             ElevatedButton(
               onPressed: () {
@@ -172,10 +275,25 @@ class _ContributionHistoryScreenState extends State<ContributionHistoryScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red,
                 foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               ),
-              child: const Text('Hapus'),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.delete, size: 16),
+                  const SizedBox(width: 4),
+                  const Text(
+                    'Hapus',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
             ),
           ],
+          actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
         );
       },
     );
@@ -183,28 +301,145 @@ class _ContributionHistoryScreenState extends State<ContributionHistoryScreen> {
 
   Future<void> _deleteContribution(Data contribution) async {
     try {
-      final result = await _databaseHelper.deleteData(contribution.id!);
-      if (result > 0) {
+      print('=== DELETING CONTRIBUTION ===');
+      print('User ID: ${_currentUser?.id}');
+      print('Contribution User ID: ${contribution.userId}');
+      print('Contribution ID: ${contribution.id}');
+      print('Contribution Name: ${contribution.speciesName}');
+      
+      // Double check: pastikan user yang menghapus adalah pemilik data
+      if (_currentUser == null || contribution.userId != _currentUser!.id) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Kontribusi berhasil dihapus'),
-              backgroundColor: Colors.green,
+              content: Text('Anda tidak memiliki izin untuk menghapus data ini'),
+              backgroundColor: Colors.red,
             ),
           );
-          _loadUserContributions(); // Refresh the list
+        }
+        return;
+      }
+
+      // Show loading indicator
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                ),
+                SizedBox(width: 16),
+                Text('Menghapus data...'),
+              ],
+            ),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+
+      // Delete from database
+      final result = await _databaseHelper.deleteData(contribution.id!);
+      print('Delete result: $result');
+      
+      if (result > 0) {
+        // Delete associated image file if exists
+        if (contribution.image != null && contribution.image!.isNotEmpty) {
+          try {
+            final imageFile = File(contribution.image!);
+            if (await imageFile.exists()) {
+              await imageFile.delete();
+              print('Associated image file deleted: ${contribution.image}');
+            }
+          } catch (e) {
+            print('Error deleting image file: $e');
+            // Continue even if image deletion fails
+          }
+        }
+
+        // ✅ NOTIFY DATA SERVICE ABOUT THE CHANGE
+        DataService().notifyDataChanged();
+
+        if (mounted) {
+          // Clear any existing snackbars
+          ScaffoldMessenger.of(context).clearSnackBars();
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.white, size: 20),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Kontribusi "${contribution.speciesName}" berhasil dihapus',
+                      style: const TextStyle(fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 3),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          );
+          
+          // Refresh the list
+          await _loadUserContributions();
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).clearSnackBars();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Gagal menghapus data. Data mungkin sudah tidak ada.'),
+              backgroundColor: Colors.red,
+            ),
+          );
         }
       }
     } catch (e) {
+      print('Error deleting contribution: $e');
       if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Gagal menghapus kontribusi: $e'),
+            content: Row(
+              children: [
+                const Icon(Icons.error, color: Colors.white, size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Gagal menghapus kontribusi: ${e.toString()}',
+                    style: const TextStyle(fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ],
+            ),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
           ),
         );
       }
     }
+  }
+
+  // Check if user can delete the contribution
+  bool _canDeleteContribution(Data contribution) {
+    return _currentUser != null && 
+           contribution.userId == _currentUser!.id;
   }
 
   void _showContributionDetail(Data contribution) {
@@ -241,36 +476,59 @@ class _ContributionHistoryScreenState extends State<ContributionHistoryScreen> {
                   ),
                   const SizedBox(height: 20),
                   
-                  // Status Badge
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: _getStatusColor(contribution.isApproved).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: _getStatusColor(contribution.isApproved),
-                        width: 1,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          _getStatusIcon(contribution.isApproved),
-                          size: 16,
-                          color: _getStatusColor(contribution.isApproved),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          _getStatusText(contribution.isApproved),
-                          style: TextStyle(
+                  // Header with status and delete action
+                  Row(
+                    children: [
+                      // Status Badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: _getStatusColor(contribution.isApproved).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
                             color: _getStatusColor(contribution.isApproved),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
+                            width: 1,
                           ),
                         ),
-                      ],
-                    ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _getStatusIcon(contribution.isApproved),
+                              size: 16,
+                              color: _getStatusColor(contribution.isApproved),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              _getStatusText(contribution.isApproved),
+                              style: TextStyle(
+                                color: _getStatusColor(contribution.isApproved),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Spacer(),
+                      // Delete button (only for own contributions)
+                      if (_canDeleteContribution(contribution))
+                        IconButton(
+                          onPressed: () {
+                            Navigator.pop(context); // Close detail sheet first
+                            _showDeleteConfirmationDialog(contribution);
+                          },
+                          icon: const Icon(Icons.delete_outline),
+                          color: Colors.red,
+                          tooltip: 'Hapus kontribusi',
+                          style: IconButton.styleFrom(
+                            backgroundColor: Colors.red.withOpacity(0.1),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 16),
                   
@@ -753,27 +1011,31 @@ class _ContributionHistoryScreenState extends State<ContributionHistoryScreen> {
                     ),
                   ),
                   
-                  // Actions
-                  PopupMenuButton<String>(
-                    onSelected: (value) {
-                      if (value == 'delete') {
-                        _showDeleteConfirmationDialog(contribution);
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            Icon(Icons.delete, color: Colors.red, size: 20),
-                            SizedBox(width: 8),
-                            Text('Hapus'),
-                          ],
+                  // Actions (only show delete for user's own contributions)
+                  if (_canDeleteContribution(contribution))
+                    PopupMenuButton<String>(
+                      onSelected: (value) {
+                        if (value == 'delete') {
+                          _showDeleteConfirmationDialog(contribution);
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete, color: Colors.red, size: 20),
+                              SizedBox(width: 8),
+                              Text('Hapus'),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
-                    child: const Icon(Icons.more_vert, color: Colors.grey),
-                  ),
+                      ],
+                      child: Icon(Icons.more_vert, color: Colors.grey[600]),
+                    )
+                  else
+                    // Show info icon for non-deletable items
+                    Icon(Icons.info_outline, color: Colors.grey[400], size: 20),
                 ],
               ),
               

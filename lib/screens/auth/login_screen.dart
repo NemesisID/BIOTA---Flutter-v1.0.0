@@ -172,6 +172,12 @@ class _LoginScreenState extends State<LoginScreen> {
                             GestureDetector(
                               onTap: () {
                                 // TODO: Implement Google sign in
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Fitur login dengan Google belum bisa digunakan'),
+                                    backgroundColor: Colors.orangeAccent,
+                                  ),
+                                );
                               },
                               child: Image.asset(
                                 'assets/images/google.png',
@@ -183,6 +189,12 @@ class _LoginScreenState extends State<LoginScreen> {
                             GestureDetector(
                               onTap: () {
                                 // TODO: Implement Facebook sign in
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Fitur login dengan Facebook belum bisa digunakan'),
+                                    backgroundColor: Colors.orangeAccent,
+                                  ),
+                                );
                               },
                               child: Image.asset(
                                 'assets/images/facebook.png',

@@ -5,6 +5,7 @@ import 'package:biota_2/constants/colors.dart';
 import 'package:biota_2/models/event.dart';
 import 'package:biota_2/data/dummy_events.dart';
 import 'package:biota_2/screens/user/event_detail_screen.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class EventScreen extends StatefulWidget {
   const EventScreen({super.key});
@@ -71,6 +72,110 @@ class _EventScreenState extends State<EventScreen> with SingleTickerProviderStat
       default:
         return _filteredEvents;
     }
+  }
+
+  // TAMBAHKAN METHOD DIALOG KONFIRMASI YANG SAMA SEPERTI DI EVENT_DETAIL_SCREEN
+  void _showRegistrationDialog(BuildContext context, Event event) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: Row(
+          children: [
+            Icon(Icons.app_registration, color: AppColors.primary),
+            const SizedBox(width: 8),
+            Expanded( // Tambahkan Expanded untuk mencegah overflow
+              child: const Text(
+                'Konfirmasi Pendaftaran',
+                style: TextStyle(fontSize: 16), // Kurangi ukuran font jika perlu
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView( // Wrap dengan SingleChildScrollView
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Anda akan diarahkan ke formulir pendaftaran untuk event:',
+                style: TextStyle(fontSize: 14), // Kurangi ukuran font
+              ),
+              const SizedBox(height: 8),
+              // Wrap text dalam Container dengan constraints
+              Container(
+                width: double.infinity,
+                child: Text(
+                  event.title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14, // Kurangi ukuran font
+                  ),
+                  softWrap: true, // Pastikan text bisa wrap
+                  overflow: TextOverflow.visible,
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (!event.isFree)
+                Container(
+                  width: double.infinity, // Pastikan menggunakan full width
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min, // Gunakan min size
+                    children: [
+                      Icon(Icons.payment, color: Colors.amber[700], size: 18), // Kurangi ukuran icon
+                      const SizedBox(width: 8),
+                      Expanded( // Wrap dengan Expanded
+                        child: Text(
+                          'Biaya: Rp ${NumberFormat('#,###').format(event.price)}',
+                          style: TextStyle(
+                            color: Colors.amber[800],
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13, // Kurangi ukuran font
+                          ),
+                          softWrap: true,
+                          overflow: TextOverflow.visible,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Batal',
+              style: TextStyle(fontSize: 14), // Kurangi ukuran font
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _launchUrl(event.registrationUrl);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.accent,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), // Kurangi padding
+            ),
+            child: const Text(
+              'Lanjut Daftar',
+              style: TextStyle(fontSize: 14), // Kurangi ukuran font
+            ),
+          ),
+        ],
+        // Tambahkan constraints untuk dialog
+        contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+        actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+      ),
+    );
   }
 
   @override
@@ -309,7 +414,7 @@ class _EventScreenState extends State<EventScreen> with SingleTickerProviderStat
         itemBuilder: (context, index) {
           return _buildEventCard(events[index]);
         },
-      ),
+      )
     );
   }
 
@@ -331,47 +436,92 @@ class _EventScreenState extends State<EventScreen> with SingleTickerProviderStat
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Event Image
+            // Event Image - Updated with network image
             ClipRRect(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
               child: Container(
                 height: 180,
                 width: double.infinity,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      AppColors.primary.withOpacity(0.3),
-                      AppColors.primary.withOpacity(0.7),
-                    ],
-                  ),
-                ),
                 child: Stack(
                   children: [
-                    // Placeholder for image
-                    Container(
+                    // Network Image
+                    CachedNetworkImage(
+                      imageUrl: event.imageUrl,
                       width: double.infinity,
                       height: double.infinity,
-                      color: AppColors.primary.withOpacity(0.1),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            _getCategoryIcon(event.category),
-                            size: 48,
-                            color: AppColors.primary.withOpacity(0.7),
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              AppColors.primary.withOpacity(0.3),
+                              AppColors.primary.withOpacity(0.7),
+                            ],
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            event.category,
-                            style: TextStyle(
-                              color: AppColors.primary.withOpacity(0.8),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            CircularProgressIndicator(
+                              color: Colors.white.withOpacity(0.8),
+                              strokeWidth: 2,
                             ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Loading...',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.8),
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              AppColors.primary.withOpacity(0.3),
+                              AppColors.primary.withOpacity(0.7),
+                            ],
                           ),
-                        ],
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              _getCategoryIcon(event.category),
+                              size: 48,
+                              color: Colors.white.withOpacity(0.7),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              event.category,
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.8),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    // Gradient overlay for better text readability
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withOpacity(0.3),
+                          ],
+                        ),
                       ),
                     ),
                     // Status Badge
@@ -444,7 +594,7 @@ class _EventScreenState extends State<EventScreen> with SingleTickerProviderStat
                 ),
               ),
             ),
-            // Event Content
+            // Event Content - rest remains the same
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -565,10 +715,10 @@ class _EventScreenState extends State<EventScreen> with SingleTickerProviderStat
                         ),
                       ),
                       const Spacer(),
-                      // Quick Register Button
+                      // Quick Register Button - UBAH INI UNTUK PANGGIL DIALOG
                       if (event.isRegistrationOpen)
                         ElevatedButton.icon(
-                          onPressed: () => _launchUrl(event.registrationUrl),
+                          onPressed: () => _showRegistrationDialog(context, event), // PANGGIL DIALOG KONFIRMASI
                           icon: const Icon(Icons.app_registration, size: 16),
                           label: const Text('Daftar'),
                           style: ElevatedButton.styleFrom(

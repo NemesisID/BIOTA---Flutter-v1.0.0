@@ -21,7 +21,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 4, // Naikkan versi database
+      version: 5, // Update version number
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -63,6 +63,18 @@ class DatabaseHelper {
       )
     ''');
 
+    // Tabel funfact untuk berita ceria
+    await db.execute('''
+      CREATE TABLE funfact(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        icon TEXT DEFAULT 'water',
+        backgroundColor TEXT DEFAULT 'blue',
+        updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    ''');
+
     // Insert admin default
     await db.insert('users', {
       'username': 'admin',
@@ -71,6 +83,15 @@ class DatabaseHelper {
       'fullName': 'Administrator',
       'isAdmin': 1,
       'createdAt': DateTime.now().toIso8601String(),
+    });
+
+    // Insert default funfact
+    await db.insert('funfact', {
+      'title': 'Paus Biru Kembali ke Laut Indonesia!',
+      'description': 'Setelah bertahun-tahun menghilang, paus biru terlihat berenang di perairan kita lagi!',
+      'icon': 'water',
+      'backgroundColor': 'blue',
+      'updatedAt': DateTime.now().toIso8601String(),
     });
   }
 
@@ -215,6 +236,36 @@ class DatabaseHelper {
         }
       }
     }
+
+    if (oldVersion < 5) {
+      // Tambah tabel funfact jika belum ada
+      try {
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS funfact(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            description TEXT NOT NULL,
+            icon TEXT DEFAULT 'water',
+            backgroundColor TEXT DEFAULT 'blue',
+            updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+          )
+        ''');
+        
+        // Cek apakah sudah ada data
+        final result = await db.query('funfact');
+        if (result.isEmpty) {
+          await db.insert('funfact', {
+            'title': 'Paus Biru Kembali ke Laut Indonesia!',
+            'description': 'Setelah bertahun-tahun menghilang, paus biru terlihat berenang di perairan kita lagi!',
+            'icon': 'water',
+            'backgroundColor': 'blue',
+            'updatedAt': DateTime.now().toIso8601String(),
+          });
+        }
+      } catch (e) {
+        print('Error creating funfact table: $e');
+      }
+    }
   }
 
   // ========== USER METHODS ==========
@@ -319,13 +370,11 @@ class DatabaseHelper {
 
   Future<List<User>> getAllUsers() async {
     final db = await database;
-    final result = await db.query(
-      'users',
-      where: 'isAdmin = ?',
-      whereArgs: [0],
-      orderBy: 'createdAt DESC',
-    );
-    return result.map((map) => User.fromMap(map)).toList();
+    final List<Map<String, dynamic>> maps = await db.query('users');
+
+    return List.generate(maps.length, (i) {
+      return User.fromMap(maps[i]);
+    });
   }
 
   Future<int> deleteUser(int userId) async {
@@ -367,19 +416,56 @@ class DatabaseHelper {
   }
 
   Future<List<Data>> getAllSpecies() async {
-    // Alias untuk getAllData untuk kompatibilitas
-    return getAllData();
+    final db = await database;
+    
+    // ✅ DEBUG: PRINT RAW QUERY RESULT
+    final List<Map<String, dynamic>> maps = await db.query(
+      'species',
+      orderBy: 'createdAt DESC',
+    );
+    
+    print('=== RAW DATABASE QUERY ===');
+    print('Raw maps count: ${maps.length}');
+    for (var map in maps) {
+      print('Raw data: $map');
+    }
+    
+    return List.generate(maps.length, (i) {
+      return Data.fromMap(maps[i]);
+    });
   }
 
   Future<List<Data>> getApprovedSpecies() async {
-    final db = await database;
-    final result = await db.query(
-      'data',
-      where: 'isApproved = ?',
-      whereArgs: [1],
-      orderBy: 'createdAt DESC',
-    );
-    return result.map((map) => Data.fromMap(map)).toList();
+    try {
+      final db = await database;
+      
+      // Debug: Print semua data terlebih dahulu
+      final allData = await db.query('data');
+      print('=== ALL DATA IN DATABASE ===');
+      print('Total records: ${allData.length}');
+      for (var row in allData) {
+        print('ID: ${row['id']}, Name: ${row['speciesName']}, Approved: ${row['isApproved']}, Lat: ${row['latitude']}, Lng: ${row['longitude']}');
+      }
+      
+      // Query data yang approved
+      final result = await db.query(
+        'data',
+        where: 'isApproved = ?',
+        whereArgs: [1],
+        orderBy: 'createdAt DESC',
+      );
+      
+      print('=== APPROVED DATA ===');
+      print('Approved records: ${result.length}');
+      for (var row in result) {
+        print('Approved - ID: ${row['id']}, Name: ${row['speciesName']}, Lat: ${row['latitude']}, Lng: ${row['longitude']}');
+      }
+      
+      return result.map((map) => Data.fromMap(map)).toList();
+    } catch (e) {
+      print('Error in getApprovedSpecies: $e');
+      rethrow;
+    }
   }
 
   Future<List<Data>> getPendingSpecies() async {
@@ -484,6 +570,69 @@ class DatabaseHelper {
     };
   }
 
+  // ========== FUNFACT METHODS ==========
+
+  Future<Map<String, dynamic>?> getFunFact() async {
+    try {
+      final db = await database;
+      final result = await db.query(
+        'funfact',
+        orderBy: 'updatedAt DESC',
+        limit: 1,
+      );
+      
+      if (result.isNotEmpty) {
+        return result.first;
+      }
+      return null;
+    } catch (e) {
+      print('Error getting fun fact: $e');
+      return null;
+    }
+  }
+
+  Future<int> updateFunFact({
+    required String title,
+    required String description,
+    String icon = 'water',
+    String backgroundColor = 'blue',
+  }) async {
+    try {
+      final db = await database;
+      
+      // Cek apakah ada data
+      final existing = await db.query('funfact');
+      
+      if (existing.isEmpty) {
+        // Insert baru jika tidak ada data
+        return await db.insert('funfact', {
+          'title': title,
+          'description': description,
+          'icon': icon,
+          'backgroundColor': backgroundColor,
+          'updatedAt': DateTime.now().toIso8601String(),
+        });
+      } else {
+        // Update data yang ada
+        return await db.update(
+          'funfact',
+          {
+            'title': title,
+            'description': description,
+            'icon': icon,
+            'backgroundColor': backgroundColor,
+            'updatedAt': DateTime.now().toIso8601String(),
+          },
+          where: 'id = ?',
+          whereArgs: [existing.first['id']],
+        );
+      }
+    } catch (e) {
+      print('Error updating fun fact: $e');
+      rethrow;
+    }
+  }
+
   // ========== UTILITY METHODS ==========
 
   Future<void> close() async {
@@ -505,5 +654,92 @@ class DatabaseHelper {
     } catch (e) {
       print('Error checking table structure: $e');
     }
+  }
+
+  // Tambahkan method untuk debug
+  Future<void> debugSpeciesData() async {
+    try {
+      final db = await database;
+      final result = await db.query('data', where: 'isApproved = ?', whereArgs: [1]);
+      
+      print('=== DEBUG SPECIES DATA ===');
+      print('Total approved species: ${result.length}');
+      
+      for (var row in result) {
+        print('Species: ${row['speciesName']} - Lat: ${row['latitude']}, Lng: ${row['longitude']}');
+      }
+      print('==========================');
+    } catch (e) {
+      print('Error debugging species data: $e');
+    }
+  }
+
+  // Method untuk force inject dummy data (untuk testing)
+  Future<void> forceInjectDummyData() async {
+    try {
+      final db = await database;
+      
+      // Hapus semua data lama (hanya untuk testing)
+      await db.delete('data');
+      
+      final dummyData = [
+        {
+          'speciesName': 'Jalak Bali Debug',
+          'latinName': 'Leucopsar rothschildi',
+          'description': 'Burung endemik Indonesia - Debug version',
+          'category': 'Hewan',
+          'status': 'Kritis',
+          'habitat': 'Area konservasi Kebun Binatang Surabaya',
+          'latitude': -7.2995,
+          'longitude': 112.7346,
+          'userId': 1,
+          'isApproved': 1,
+          'createdAt': DateTime.now().toIso8601String(),
+        },
+        {
+          'speciesName': 'Pohon Baobab Debug',
+          'latinName': 'Adansonia digitata',
+          'description': 'Pohon ikonik - Debug version',
+          'category': 'Tumbuhan',
+          'status': 'Aman',
+          'habitat': 'Taman kota, area hijau Taman Bungkul',
+          'latitude': -7.2912,
+          'longitude': 112.7348,
+          'userId': 1,
+          'isApproved': 1,
+          'createdAt': DateTime.now().toIso8601String(),
+        },
+      ];
+      
+      for (var data in dummyData) {
+        final id = await db.insert('data', data);
+        print('Force inserted: ${data['speciesName']} with ID: $id');
+      }
+      
+    } catch (e) {
+      print('Error in forceInjectDummyData: $e');
+      rethrow;
+    }
+  }
+
+  // ✅ UPDATE STATUS SPECIES
+  Future<int> updateSpeciesStatus(int id, String status) async {
+    final db = await database;
+    return await db.update(
+      'species',
+      {'status': status},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  // ✅ DELETE SPECIES
+  Future<int> deleteSpecies(int id) async {
+    final db = await database;
+    return await db.delete(
+      'species',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 }

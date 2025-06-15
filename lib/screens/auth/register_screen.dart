@@ -197,6 +197,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             GestureDetector(
                               onTap: () {
                                 // TODO: Implement Google sign in
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Fitur sign up dengan Google belum bisa digunakan'),
+                                    backgroundColor: Colors.orangeAccent,
+                                  ),
+                                );
                               },
                               child: Image.asset(
                                 'assets/images/google.png',
@@ -208,6 +214,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             GestureDetector(
                               onTap: () {
                                 // TODO: Implement Facebook sign in
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Fitur sign up dengan Facebook belum bisa digunakan'),
+                                    backgroundColor: Colors.orangeAccent,
+                                  ),
+                                );
                               },
                               child: Image.asset(
                                 'assets/images/facebook.png',

@@ -30,7 +30,7 @@ class _AddSpeciesFormState extends State<AddSpeciesForm> {
 
   // Form state
   String _selectedType = 'Hewan';
-  String _selectedStatus = 'Tidak Rentan';
+  String _selectedStatus = 'Banyak';
   File? _selectedImage;
   bool _isLoading = false;
   bool _isLoadingLocation = false;
@@ -40,7 +40,7 @@ class _AddSpeciesFormState extends State<AddSpeciesForm> {
   // Options
   final List<String> _typeOptions = ['Hewan', 'Tumbuhan'];
   final List<String> _statusOptions = [
-    'Tidak Rentan',
+    'Banyak',
     'Rentan', 
     'Terancam Punah'
   ];
@@ -286,7 +286,7 @@ class _AddSpeciesFormState extends State<AddSpeciesForm> {
         status: _convertStatusToDatabase(_selectedStatus),
         description: _descriptionController.text.trim(),
         funFact: null,
-        userId: _currentUser!.id!,
+        userId: _currentUser!.id,
         isApproved: 0,
         createdAt: DateTime.now().toIso8601String(),
         latitude: _currentPosition?.latitude,

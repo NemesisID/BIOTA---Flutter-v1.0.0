@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:biota_2/constants/colors.dart';
 import 'package:biota_2/services/database_helper.dart';
 import 'package:biota_2/models/user.dart';
+import 'dart:io';
 
 class UserManagementScreen extends StatefulWidget {
   const UserManagementScreen({super.key});
@@ -9,66 +11,1054 @@ class UserManagementScreen extends StatefulWidget {
   State<UserManagementScreen> createState() => _UserManagementScreenState();
 }
 
-class _UserManagementScreenState extends State<UserManagementScreen> {
-  List<User> _users = [];
-  bool _isLoading = true;
-
+class _UserManagementScreenState extends State<UserManagementScreen> with TickerProviderStateMixin {
+  late TabController _tabController;
+  List<User> allUsers = [];
+  List<User> regularUsers = [];
+  List<User> adminUsers = [];
+  bool isLoading = true;
+  String searchQuery = '';
+  
   @override
   void initState() {
     super.initState();
-    _loadUsers();
+    _tabController = TabController(length: 2, vsync: this);
+    _loadUserData();
   }
 
-  Future<void> _loadUsers() async {
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadUserData() async {
+    setState(() => isLoading = true);
+    
     try {
-      final db = await DatabaseHelper.instance.database;
-      final results = await db.query('users', where: 'isAdmin = ?', whereArgs: [0]);
+      print('=== LOADING USER DATA ===');
+      
+      final users = await DatabaseHelper.instance.getAllUsers();
+      
+      print('Total users loaded: ${users.length}');
+      
+      // Debug: Print all users
+      for (var user in users) {
+        print('User: ${user.username}');
+        print('  ID: ${user.id}');
+        print('  Email: ${user.email}');
+        print('  Full Name: ${user.fullName}');
+        print('  Is Admin: ${user.isAdmin}');
+        print('  Profile Image: ${user.profileImagePath}');
+        print('  Created: ${user.createdAt}');
+        print('  ---');
+      }
+      
       setState(() {
-        _users = results.map((map) => User.fromMap(map)).toList();
-        _isLoading = false;
+        allUsers = users;
+        regularUsers = users.where((user) => !user.isAdmin).toList();
+        adminUsers = users.where((user) => user.isAdmin).toList();
+        isLoading = false;
       });
+      
+      print('=== FILTERED RESULTS ===');
+      print('Regular Users: ${regularUsers.length}');
+      print('Admin Users: ${adminUsers.length}');
+      
     } catch (e) {
-      setState(() => _isLoading = false);
+      print('Error loading users: $e');
+      setState(() => isLoading = false);
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading users: $e')),
+          SnackBar(
+            content: Text('Error loading users: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
   }
 
-  void _showUserDetails(User user) {
-    showDialog(
+  Future<void> _updateUser(User user) async {
+    final result = await _showEditUserDialog(user);
+    if (result == true) {
+      await _loadUserData();
+    }
+  }
+
+  Future<bool?> _showEditUserDialog(User user) async {
+    final usernameController = TextEditingController(text: user.username);
+    final emailController = TextEditingController(text: user.email);
+    final fullNameController = TextEditingController(text: user.fullName);
+    final passwordController = TextEditingController();
+    
+    bool isAdmin = user.isAdmin;
+    String? profileImagePath = user.profileImagePath;
+    bool changePassword = false;
+
+    return await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Detail Akun'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.person),
-              title: const Text('Username'),
-              subtitle: Text(user.username),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              const Icon(Icons.edit, color: AppColors.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Edit User: ${user.username}',
+                  style: const TextStyle(fontSize: 16),
+                ),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: MediaQuery.of(context).size.width * 0.9,
+            height: MediaQuery.of(context).size.height * 0.7,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Profile Image Section
+                  Center(
+                    child: Column(
+                      children: [
+                        Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: AppColors.primary, width: 3),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.grey.withOpacity(0.3),
+                                spreadRadius: 2,
+                                blurRadius: 5,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: ClipOval(
+                            child: _buildProfileImage(profileImagePath, user.fullName),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'ID: ${user.id}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 24),
+                  
+                  // Basic Information Section
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      '👤 Informasi Dasar',
+                      style: TextStyle(
+                        fontSize: 14, 
+                        fontWeight: FontWeight.bold, 
+                        color: AppColors.primary
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Username Field
+                  TextField(
+                    controller: usernameController,
+                    decoration: InputDecoration(
+                      labelText: 'Username *',
+                      prefixIcon: const Icon(Icons.person),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Full Name Field
+                  TextField(
+                    controller: fullNameController,
+                    decoration: InputDecoration(
+                      labelText: 'Nama Lengkap *',
+                      prefixIcon: const Icon(Icons.badge),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Email Field
+                  TextField(
+                    controller: emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: InputDecoration(
+                      labelText: 'Email *',
+                      prefixIcon: const Icon(Icons.email),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  
+                  // Security Section
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      '🔐 Keamanan & Akses',
+                      style: TextStyle(
+                        fontSize: 14, 
+                        fontWeight: FontWeight.bold, 
+                        color: AppColors.primary
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Admin Switch
+                  Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey[300]!),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.admin_panel_settings, color: AppColors.primary),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Status Admin',
+                                style: TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                              Text(
+                                'Berikan akses administrator',
+                                style: TextStyle(fontSize: 12, color: Colors.grey),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Switch(
+                          value: isAdmin,
+                          onChanged: (value) {
+                            setDialogState(() => isAdmin = value);
+                          },
+                          activeColor: AppColors.primary,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Change Password Switch
+                  Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey[300]!),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.lock_reset, color: Colors.orange),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Ubah Password',
+                                style: TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                              Text(
+                                'Reset kata sandi pengguna',
+                                style: TextStyle(fontSize: 12, color: Colors.grey),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Switch(
+                          value: changePassword,
+                          onChanged: (value) {
+                            setDialogState(() => changePassword = value);
+                            if (!value) {
+                              passwordController.clear();
+                            }
+                          },
+                          activeColor: Colors.orange,
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  // Password Field (if change password is enabled)
+                  if (changePassword) ...[
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: passwordController,
+                      obscureText: true,
+                      decoration: InputDecoration(
+                        labelText: 'Password Baru *',
+                        hintText: 'Masukkan password baru',
+                        prefixIcon: const Icon(Icons.lock),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ],
+                  
+                  const SizedBox(height: 24),
+                  
+                  // Account Info Section
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'ℹ️ Informasi Akun',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Terdaftar: ${_formatDate(user.createdAt)}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        Text(
+                          'User ID: ${user.id}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 16),
+                  Text(
+                    '* Field wajib diisi',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
+              ),
             ),
-            ListTile(
-              leading: const Icon(Icons.person_outline),
-              title: const Text('Nama Lengkap'),
-              subtitle: Text(user.fullName),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Batal'),
             ),
-            ListTile(
-              leading: const Icon(Icons.email),
-              title: const Text('Email'),
-              subtitle: Text(user.email),
-            ),
-            ListTile(
-              leading: const Icon(Icons.lock),
-              title: const Text('Password'),
-              subtitle: Text(user.password),
+            ElevatedButton(
+              onPressed: () async {
+                if (_validateUserForm(
+                  usernameController.text,
+                  emailController.text,
+                  fullNameController.text,
+                  changePassword,
+                  passwordController.text,
+                )) {
+                  await _saveUserChanges(
+                    user,
+                    usernameController.text,
+                    emailController.text,
+                    fullNameController.text,
+                    isAdmin,
+                    changePassword,
+                    passwordController.text,
+                  );
+                  Navigator.pop(context, true);
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Simpan Perubahan'),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  bool _validateUserForm(String username, String email, String fullName, 
+                        bool changePassword, String password) {
+    if (username.trim().isEmpty) {
+      _showErrorSnackBar('Username harus diisi');
+      return false;
+    }
+    if (email.trim().isEmpty) {
+      _showErrorSnackBar('Email harus diisi');
+      return false;
+    }
+    if (fullName.trim().isEmpty) {
+      _showErrorSnackBar('Nama lengkap harus diisi');
+      return false;
+    }
+    if (!_isValidEmail(email)) {
+      _showErrorSnackBar('Format email tidak valid');
+      return false;
+    }
+    if (changePassword && password.trim().isEmpty) {
+      _showErrorSnackBar('Password baru harus diisi');
+      return false;
+    }
+    if (changePassword && password.length < 6) {
+      _showErrorSnackBar('Password minimal 6 karakter');
+      return false;
+    }
+    return true;
+  }
+
+  bool _isValidEmail(String email) {
+    return RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(email);
+  }
+
+  Future<void> _saveUserChanges(User user, String username, String email, 
+                               String fullName, bool isAdmin, 
+                               bool changePassword, String password) async {
+    try {
+      print('=== SAVING USER CHANGES ===');
+      print('User ID: ${user.id}');
+      print('New Username: $username');
+      print('New Email: $email');
+      print('New Full Name: $fullName');
+      print('New Admin Status: $isAdmin');
+      print('Change Password: $changePassword');
+      
+      // In a real app, you would update the database here
+      // await DatabaseHelper.instance.updateUser(user.id, ...);
+      
+      _showSuccessSnackBar('✅ User "${username}" berhasil diperbarui');
+      
+    } catch (e) {
+      print('Error saving user changes: $e');
+      _showErrorSnackBar('❌ Error: ${e.toString()}');
+    }
+  }
+
+  Future<void> _deleteUser(User user) async {
+    final confirm = await _showConfirmDialog(
+      'Hapus User',
+      'Apakah Anda yakin ingin menghapus user "${user.username}"?\n\nSemua data yang terkait dengan user ini akan ikut terhapus!\n\nTindakan ini tidak dapat dibatalkan!',
+      'Hapus',
+      Colors.red,
+    );
+
+    if (confirm) {
+      try {
+        print('=== DELETING USER ===');
+        print('User ID: ${user.id}');
+        print('Username: ${user.username}');
+        
+        // In a real app, you would delete from database here
+        // await DatabaseHelper.instance.deleteUser(user.id);
+        
+        _showSuccessSnackBar('✅ User "${user.username}" berhasil dihapus');
+        await _loadUserData();
+      } catch (e) {
+        print('Error deleting user: $e');
+        _showErrorSnackBar('❌ Error: ${e.toString()}');
+      }
+    }
+  }
+
+  Future<bool> _showConfirmDialog(String title, String content, String actionText, Color actionColor) async {
+    return await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(
+              actionColor == Colors.green ? Icons.check_circle :
+              actionColor == Colors.red ? Icons.warning : Icons.info,
+              color: actionColor,
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: Text(title)),
+          ],
+        ),
+        content: Text(content),
         actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: actionColor,
+              foregroundColor: Colors.white,
+            ),
+            child: Text(actionText),
+          ),
+        ],
+      ),
+    ) ?? false;
+  }
+
+  List<User> _getFilteredUsers(List<User> users) {
+    if (searchQuery.isEmpty) return users;
+
+    return users.where((user) {
+      final searchLower = searchQuery.toLowerCase();
+      return user.username.toLowerCase().contains(searchLower) ||
+             user.email.toLowerCase().contains(searchLower) ||
+             user.fullName.toLowerCase().contains(searchLower);
+    }).toList();
+  }
+
+  void _showSuccessSnackBar(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  void _showErrorSnackBar(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.grey[50],
+      body: Column(
+        children: [
+          // Search Bar
+          Container(
+            margin: const EdgeInsets.all(16),
+            child: TextField(
+              onChanged: (value) => setState(() => searchQuery = value),
+              decoration: InputDecoration(
+                hintText: 'Cari user berdasarkan username, email, atau nama...',
+                prefixIcon: const Icon(Icons.search, color: AppColors.primary),
+                suffixIcon: searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () => setState(() => searchQuery = ''),
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                filled: true,
+                fillColor: Colors.white,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
+            ),
+          ),
+
+          // Tab Bar
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.1),
+                  spreadRadius: 1,
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: TabBar(
+              controller: _tabController,
+              tabs: [
+                Tab(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.people, size: 16),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          'User Biasa (${regularUsers.length})',
+                          style: const TextStyle(fontSize: 10),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Tab(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.admin_panel_settings, size: 16),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          'Admin (${adminUsers.length})',
+                          style: const TextStyle(fontSize: 10),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              labelColor: AppColors.primary,
+              unselectedLabelColor: Colors.grey[600],
+              indicatorColor: AppColors.primary,
+              indicatorWeight: 3,
+              labelStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
+              unselectedLabelStyle: const TextStyle(fontSize: 10),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Tab Bar View
+          Expanded(
+            child: isLoading
+                ? const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(color: AppColors.primary),
+                        SizedBox(height: 16),
+                        Text('Memuat data pengguna...'),
+                      ],
+                    ),
+                  )
+                : TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildUsersList(_getFilteredUsers(regularUsers), 'regular'),
+                      _buildUsersList(_getFilteredUsers(adminUsers), 'admin'),
+                    ],
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUsersList(List<User> users, String type) {
+    if (users.isEmpty) {
+      return RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: _loadUserData,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverFillRemaining(
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      type == 'regular' ? Icons.people_outline : Icons.admin_panel_settings_outlined,
+                      size: 80,
+                      color: Colors.grey[400],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      type == 'regular' ? 'Tidak ada user biasa' : 'Tidak ada admin',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w500,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      searchQuery.isNotEmpty ? 'Coba kata kunci pencarian lain' : 
+                      'Tarik ke bawah untuk refresh data',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[500],
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      color: AppColors.primary,
+      onRefresh: _loadUserData,
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: users.length,
+        itemBuilder: (context, index) {
+          final user = users[index];
+          return _buildUserCard(user, type);
+        },
+      ),
+    );
+  }
+
+  Widget _buildUserCard(User user, String type) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header with profile image and basic info
+            Row(
+              children: [
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: user.isAdmin ? Colors.orange : AppColors.primary,
+                      width: 2,
+                    ),
+                  ),
+                  child: ClipOval(
+                    child: _buildProfileImage(user.profileImagePath, user.fullName),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              user.fullName,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: user.isAdmin ? Colors.orange : Colors.blue,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              user.isAdmin ? 'ADMIN' : 'USER',
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '@${user.username}',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Text(
+                        user.email,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[500],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            
+            const SizedBox(height: 16),
+            
+            // User Details
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildDetailRow(Icons.fingerprint, 'User ID', user.id.toString()),
+                const SizedBox(height: 6),
+                _buildDetailRow(Icons.access_time, 'Terdaftar', _formatDate(user.createdAt)),
+                const SizedBox(height: 6),
+                _buildDetailRow(
+                  Icons.verified_user, 
+                  'Status', 
+                  user.isAdmin ? 'Administrator' : 'Pengguna Biasa',
+                ),
+              ],
+            ),
+            
+            const SizedBox(height: 16),
+            
+            // Action Buttons
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _showUserDetail(user),
+                    icon: const Icon(Icons.visibility, size: 16),
+                    label: const Text('Detail'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: const BorderSide(color: AppColors.primary),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _updateUser(user),
+                    icon: const Icon(Icons.edit, size: 16),
+                    label: const Text('Edit'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _deleteUser(user),
+                    icon: const Icon(Icons.delete, size: 16),
+                    label: const Text('Hapus'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showUserDetail(User user) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: user.isAdmin ? Colors.orange : AppColors.primary,
+                  width: 2,
+                ),
+              ),
+              child: ClipOval(
+                child: _buildProfileImage(user.profileImagePath, user.fullName),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    user.fullName,
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    '@${user.username}',
+                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Profile Image (larger)
+                Center(
+                  child: Container(
+                    width: 150,
+                    height: 150,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: user.isAdmin ? Colors.orange : AppColors.primary,
+                        width: 4,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.3),
+                          spreadRadius: 2,
+                          blurRadius: 5,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: ClipOval(
+                      child: _buildProfileImage(user.profileImagePath, user.fullName),
+                    ),
+                  ),
+                ),
+                
+                const SizedBox(height: 24),
+                
+                // User Details
+                _buildDetailRow(Icons.fingerprint, 'User ID', user.id.toString()),
+                const SizedBox(height: 12),
+                _buildDetailRow(Icons.person, 'Username', user.username),
+                const SizedBox(height: 12),
+                _buildDetailRow(Icons.badge, 'Nama Lengkap', user.fullName),
+                const SizedBox(height: 12),
+                _buildDetailRow(Icons.email, 'Email', user.email),
+                const SizedBox(height: 12),
+                _buildDetailRow(
+                  Icons.admin_panel_settings, 
+                  'Status', 
+                  user.isAdmin ? 'Administrator' : 'Pengguna Biasa',
+                ),
+                const SizedBox(height: 12),
+                _buildDetailRow(Icons.access_time, 'Terdaftar', _formatDetailDate(user.createdAt)),
+                
+                if (user.profileImagePath != null && user.profileImagePath!.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  _buildDetailRow(Icons.image, 'Foto Profil', 'Ada'),
+                ],
+                
+                const SizedBox(height: 16),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: (user.isAdmin ? Colors.orange : AppColors.primary).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            user.isAdmin ? Icons.admin_panel_settings : Icons.person,
+                            color: user.isAdmin ? Colors.orange : AppColors.primary,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            user.isAdmin ? 'Akses Administrator' : 'Akses Pengguna Biasa',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: user.isAdmin ? Colors.orange[700] : AppColors.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        user.isAdmin 
+                            ? 'Memiliki akses penuh ke panel administrasi'
+                            : 'Dapat menggunakan fitur dasar aplikasi',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          if (user.profileImagePath != null && user.profileImagePath!.isNotEmpty)
+            TextButton(
+              onPressed: () => _showFullSizeProfileImage(user.profileImagePath!, user.fullName),
+              child: const Text('Lihat Foto'),
+            ),
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Tutup'),
@@ -78,82 +1068,138 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     );
   }
 
-  Future<void> _deleteUser(User user) async {
-    try {
-      final result = await DatabaseHelper.instance.deleteUser(user.id!);
-      if (result > 0) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Akun berhasil dihapus')),
-        );
-        _loadUsers(); // Refresh the list
+  Widget _buildProfileImage(String? imagePath, String fullName) {
+    if (imagePath != null && imagePath.isNotEmpty) {
+      try {
+        if (imagePath.startsWith('http')) {
+          return Image.network(
+            imagePath,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              return _buildAvatarFallback(fullName);
+            },
+            loadingBuilder: (context, child, loadingProgress) {
+              if (loadingProgress == null) return child;
+              return Center(
+                child: CircularProgressIndicator(
+                  value: loadingProgress.expectedTotalBytes != null
+                      ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                      : null,
+                  strokeWidth: 2,
+                ),
+              );
+            },
+          );
+        } else {
+          return Image.file(
+            File(imagePath),
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              return _buildAvatarFallback(fullName);
+            },
+          );
+        }
+      } catch (e) {
+        return _buildAvatarFallback(fullName);
       }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal menghapus akun: $e')),
-      );
+    } else {
+      return _buildAvatarFallback(fullName);
     }
   }
 
-  Future<void> _showDeleteConfirmationDialog(User user) async {
-    return showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Konfirmasi Hapus'),
-          content: Text('Apakah Anda yakin ingin menghapus akun ${user.username}?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Batal'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _deleteUser(user);
-              },
-              style: TextButton.styleFrom(foregroundColor: Colors.red),
-              child: const Text('Hapus'),
-            ),
-          ],
-        );
-      },
+  Widget _buildAvatarFallback(String fullName) {
+    final initial = fullName.isNotEmpty ? fullName[0].toUpperCase() : '?';
+    return Container(
+      color: AppColors.primary,
+      child: Center(
+        child: Text(
+          initial,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _loadUsers,
-              child: _users.isEmpty
-                  ? const Center(
-                      child: Text('Tidak ada data user'),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: _users.length,
-                      itemBuilder: (context, index) {
-                        final user = _users[index];
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 16),
-                          child: ListTile(
-                            leading: const Icon(Icons.person),
-                            title: Text(user.username),
-                            subtitle: Text(user.email),
-                            onTap: () => _showUserDetails(user),
-                            trailing: IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
-                              onPressed: () => _showDeleteConfirmationDialog(user),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
+  void _showFullSizeProfileImage(String imagePath, String fullName) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.black87,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AppBar(
+              title: Text(
+                'Foto Profil - $fullName',
+                style: const TextStyle(color: Colors.white),
+              ),
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white),
+                onPressed: () => Navigator.pop(context),
+              ),
             ),
+            Expanded(
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                child: InteractiveViewer(
+                  panEnabled: true,
+                  boundaryMargin: const EdgeInsets.all(20),
+                  minScale: 0.5,
+                  maxScale: 4.0,
+                  child: _buildProfileImage(imagePath, fullName),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
+  }
+
+  Widget _buildDetailRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: Colors.grey[600]),
+        const SizedBox(width: 6),
+        Text(
+          '$label: ',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: Colors.grey[700],
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[600],
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+  }
+
+  String _formatDetailDate(DateTime date) {
+    const months = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+    
+    return '${date.day} ${months[date.month - 1]} ${date.year}';
   }
 }

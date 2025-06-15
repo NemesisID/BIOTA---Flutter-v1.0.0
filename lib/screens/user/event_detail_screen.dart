@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:biota_2/constants/colors.dart';
 import 'package:biota_2/models/event.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class EventDetailScreen extends StatelessWidget {
   final Event event;
@@ -25,22 +26,70 @@ class EventDetailScreen extends StatelessWidget {
               background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  // Placeholder for image
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          AppColors.primary.withOpacity(0.3),
-                          AppColors.primary.withOpacity(0.8),
+                  // Network Image
+                  CachedNetworkImage(
+                    imageUrl: event.imageUrl,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            AppColors.primary.withOpacity(0.3),
+                            AppColors.primary.withOpacity(0.8),
+                          ],
+                        ),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          CircularProgressIndicator(
+                            color: Colors.white.withOpacity(0.8),
+                            strokeWidth: 3,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Memuat gambar...',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.8),
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                    child: Icon(
-                      Icons.image,
-                      size: 80,
-                      color: Colors.white.withOpacity(0.3),
+                    errorWidget: (context, url, error) => Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            AppColors.primary.withOpacity(0.3),
+                            AppColors.primary.withOpacity(0.8),
+                          ],
+                        ),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.image_not_supported,
+                            size: 80,
+                            color: Colors.white.withOpacity(0.6),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Gagal memuat gambar',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.8),
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                   // Gradient overlay
@@ -68,6 +117,13 @@ class EventDetailScreen extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: event.statusColor,
                             borderRadius: BorderRadius.circular(15),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.3),
+                                blurRadius: 6,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
                           ),
                           child: Text(
                             event.statusText,
@@ -85,6 +141,13 @@ class EventDetailScreen extends StatelessWidget {
                             decoration: BoxDecoration(
                               color: event.isRegistrationOpen ? Colors.green : Colors.red,
                               borderRadius: BorderRadius.circular(15),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.3),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
                             ),
                             child: Text(
                               event.isRegistrationOpen ? 'Pendaftaran Buka' : 'Pendaftaran Tutup',
@@ -378,47 +441,76 @@ class EventDetailScreen extends StatelessWidget {
           children: [
             Icon(Icons.app_registration, color: AppColors.primary),
             const SizedBox(width: 8),
-            const Text('Konfirmasi Pendaftaran'),
+            Expanded( // Tambahkan Expanded untuk mencegah overflow
+              child: const Text(
+                'Konfirmasi Pendaftaran',
+                style: TextStyle(fontSize: 16), // Kurangi ukuran font jika perlu
+              ),
+            ),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Anda akan diarahkan ke formulir pendaftaran untuk event:'),
-            const SizedBox(height: 8),
-            Text(
-              event.title,
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            if (!event.isFree)
+        content: SingleChildScrollView( // Wrap dengan SingleChildScrollView
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Anda akan diarahkan ke formulir pendaftaran untuk event:',
+                style: TextStyle(fontSize: 14), // Kurangi ukuran font
+              ),
+              const SizedBox(height: 8),
+              // Wrap text dalam Container dengan constraints
               Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.amber.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.payment, color: Colors.amber[700], size: 20),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Biaya: Rp ${NumberFormat('#,###').format(event.price)}',
-                      style: TextStyle(
-                        color: Colors.amber[800],
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
+                width: double.infinity,
+                child: Text(
+                  event.title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14, // Kurangi ukuran font
+                  ),
+                  softWrap: true, // Pastikan text bisa wrap
+                  overflow: TextOverflow.visible,
                 ),
               ),
-          ],
+              const SizedBox(height: 12),
+              if (!event.isFree)
+                Container(
+                  width: double.infinity, // Pastikan menggunakan full width
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min, // Gunakan min size
+                    children: [
+                      Icon(Icons.payment, color: Colors.amber[700], size: 18), // Kurangi ukuran icon
+                      const SizedBox(width: 8),
+                      Expanded( // Wrap dengan Expanded
+                        child: Text(
+                          'Biaya: Rp ${NumberFormat('#,###').format(event.price)}',
+                          style: TextStyle(
+                            color: Colors.amber[800],
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13, // Kurangi ukuran font
+                          ),
+                          softWrap: true,
+                          overflow: TextOverflow.visible,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Batal'),
+            child: const Text(
+              'Batal',
+              style: TextStyle(fontSize: 14), // Kurangi ukuran font
+            ),
           ),
           ElevatedButton(
             onPressed: () {
@@ -428,10 +520,17 @@ class EventDetailScreen extends StatelessWidget {
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.accent,
               foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), // Kurangi padding
             ),
-            child: const Text('Lanjut Daftar'),
+            child: const Text(
+              'Lanjut Daftar',
+              style: TextStyle(fontSize: 14), // Kurangi ukuran font
+            ),
           ),
         ],
+        // Tambahkan constraints untuk dialog
+        contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+        actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
       ),
     );
   }

@@ -3,6 +3,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:biota_2/constants/colors.dart';
 import 'package:biota_2/models/user.dart';
 import 'package:biota_2/services/database_helper.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as path;
+import 'package:biota_2/widgets/image_crop_widget.dart';
 
 class EditProfileScreen extends StatefulWidget {
   final User user;
@@ -26,12 +31,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   bool _obscureCurrentPassword = true;
   bool _obscureNewPassword = true;
   bool _obscureConfirmPassword = true;
+  File? _profileImageFile;
+  bool _isUpdatingPhoto = false;
 
   @override
   void initState() {
     super.initState();
     _usernameController.text = widget.user.username;
     _fullNameController.text = widget.user.fullName;
+    if (widget.user.profileImagePath != null) {
+      _profileImageFile = File(widget.user.profileImagePath!);
+    }
   }
 
   @override
@@ -133,6 +143,195 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+  Future<void> _changeProfilePhoto() async {
+    try {
+      final ImageSource? source = await _showImageSourceDialog();
+      if (source == null) return;
+
+      setState(() {
+        _isUpdatingPhoto = true;
+      });
+
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: source,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 85,
+      );
+
+      if (image == null) {
+        setState(() {
+          _isUpdatingPhoto = false;
+        });
+        return;
+      }
+
+      final File imageFile = File(image.path);
+      final croppedImageBytes = await Navigator.push<List<int>>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ImageCropWidget(
+            imageFile: imageFile,
+            onCropped: (croppedBytes) {
+              Navigator.pop(context, croppedBytes);
+            },
+          ),
+        ),
+      );
+
+      if (croppedImageBytes == null) {
+        setState(() {
+          _isUpdatingPhoto = false;
+        });
+        return;
+      }
+
+      final String? savedImagePath = await _saveImageToLocal(croppedImageBytes);
+
+      if (savedImagePath != null) {
+        setState(() {
+          _profileImageFile = File(savedImagePath);
+        });
+
+        // Update user profile in database
+        final updatedUser = widget.user.copyWith(profileImagePath: savedImagePath);
+        await DatabaseHelper.instance.updateUserProfile(updatedUser);
+
+        // Update SharedPreferences
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('profile_image_path', savedImagePath);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Foto profil berhasil diperbarui'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        throw Exception('Gagal menyimpan foto profil');
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUpdatingPhoto = false;
+        });
+      }
+    }
+  }
+
+  Future<ImageSource?> _showImageSourceDialog() async {
+    return showDialog<ImageSource>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Pilih Sumber Foto'),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.camera_alt, color: AppColors.primary),
+                title: const Text('Kamera'),
+                onTap: () => Navigator.of(context).pop(ImageSource.camera),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library, color: AppColors.primary),
+                title: const Text('Galeri'),
+                onTap: () => Navigator.of(context).pop(ImageSource.gallery),
+              ),
+              if (_profileImageFile != null)
+                ListTile(
+                  leading: const Icon(Icons.delete, color: Colors.red),
+                  title: const Text('Hapus Foto'),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _removeProfilePhoto();
+                  },
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<String?> _saveImageToLocal(List<int> imageBytes) async {
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      final profileDir = Directory(path.join(appDir.path, 'profile_images'));
+
+      if (!await profileDir.exists()) {
+        await profileDir.create(recursive: true);
+      }
+
+      // Delete old profile image if exists
+      if (_profileImageFile != null && await _profileImageFile!.exists()) {
+        await _profileImageFile!.delete();
+      }
+
+      final fileName = 'profile_${widget.user.id}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final file = File(path.join(profileDir.path, fileName));
+
+      await file.writeAsBytes(imageBytes);
+      return file.path;
+    } catch (e) {
+      print('Error saving image: $e');
+      return null;
+    }
+  }
+
+  Future<void> _removeProfilePhoto() async {
+    try {
+      setState(() {
+        _isUpdatingPhoto = true;
+      });
+
+      if (_profileImageFile != null && await _profileImageFile!.exists()) {
+        await _profileImageFile!.delete();
+      }
+
+      setState(() {
+        _profileImageFile = null;
+      });
+
+      // Update user profile in database
+      final updatedUser = widget.user.copyWith(profileImagePath: null);
+      await DatabaseHelper.instance.updateUserProfile(updatedUser);
+
+      // Update SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('profile_image_path');
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Foto profil berhasil dihapus'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUpdatingPhoto = false;
+        });
+      }
+    }
+  }
+
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -188,10 +387,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       CircleAvatar(
                         radius: 60,
                         backgroundColor: AppColors.primary.withOpacity(0.1),
-                        child: widget.user.profileImagePath != null
+                        child: _profileImageFile != null
                             ? ClipOval(
-                                child: Image.asset(
-                                  widget.user.profileImagePath!,
+                                child: Image.file(
+                                  _profileImageFile!,
                                   width: 120,
                                   height: 120,
                                   fit: BoxFit.cover,
@@ -219,13 +418,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             shape: BoxShape.circle,
                           ),
                           child: IconButton(
-                            icon: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
-                            onPressed: () {
-                              // TODO: Implement image picker
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Fitur ubah foto akan segera hadir')),
-                              );
-                            },
+                            icon: _isUpdatingPhoto
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.camera_alt, color: Colors.white, size: 20),
+                            onPressed: _isUpdatingPhoto ? null : _changeProfilePhoto,
                           ),
                         ),
                       ),

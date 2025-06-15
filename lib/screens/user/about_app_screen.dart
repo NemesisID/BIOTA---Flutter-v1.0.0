@@ -13,7 +13,7 @@ class AboutAppScreen extends StatelessWidget {
         slivers: [
           // App Bar dengan Gradient
           SliverAppBar(
-            expandedHeight: 200,
+            expandedHeight: 240,
             floating: false,
             pinned: true,
             backgroundColor: AppColors.primary,
@@ -81,7 +81,7 @@ class AboutAppScreen extends StatelessWidget {
                 _buildInfoCard(
                   title: 'Informasi Aplikasi',
                   children: [
-                    _buildInfoRow(Icons.info, 'Versi', '0.1.1'),
+                    _buildInfoRow(Icons.info, 'Versi', '1.0.0'),
                     _buildInfoRow(Icons.build, 'Build', '2025.06.13'),
                     _buildInfoRow(Icons.android, 'Platform', 'Android'),
                     _buildInfoRow(Icons.language, 'Bahasa', 'Indonesia'),
@@ -643,84 +643,6 @@ class AboutAppScreen extends StatelessWidget {
               _launchEmail('support@biota.app');
             },
             child: const Text('Kirim Email'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showPrivacyDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Kebijakan Privasi'),
-        content: const SingleChildScrollView(
-          child: Text(
-            'BIOTA berkomitmen untuk melindungi privasi pengguna. Kami hanya mengumpulkan data yang diperlukan untuk memberikan layanan terbaik dan tidak akan membagikan informasi pribadi Anda kepada pihak ketiga tanpa persetujuan.\n\n'
-            'Data yang kami kumpulkan:\n'
-            '• Informasi profil pengguna\n'
-            '• Data spesies yang dikirimkan\n'
-            '• Lokasi untuk fitur pemetaan\n'
-            '• Data penggunaan aplikasi\n\n'
-            'Semua data disimpan dengan aman dan dienkripsi.',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Tutup'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showTermsDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Syarat & Ketentuan'),
-        content: const SingleChildScrollView(
-          child: Text(
-            'Dengan menggunakan aplikasi BIOTA, Anda menyetujui syarat dan ketentuan berikut:\n\n'
-            '1. Penggunaan aplikasi harus untuk tujuan yang positif dan mendukung konservasi\n'
-            '2. Data yang dikirimkan harus akurat dan tidak menyesatkan\n'
-            '3. Dilarang mengirimkan konten yang melanggar hukum\n'
-            '4. Kami berhak menghapus konten yang tidak sesuai\n'
-            '5. Aplikasi disediakan "sebagaimana adanya"\n\n'
-            'Syarat lengkap dapat dilihat di website kami.',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Tutup'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showSecurityDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Keamanan Data'),
-        content: const SingleChildScrollView(
-          child: Text(
-            'Keamanan data Anda adalah prioritas kami:\n\n'
-            '• Enkripsi end-to-end untuk semua data\n'
-            '• Server yang aman dan terpercaya\n'
-            '• Backup rutin untuk mencegah kehilangan data\n'
-            '• Autentikasi berlapis untuk akses admin\n'
-            '• Monitoring keamanan 24/7\n\n'
-            'Jika Anda menemukan masalah keamanan, segera laporkan kepada kami.',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Tutup'),
           ),
         ],
       ),
