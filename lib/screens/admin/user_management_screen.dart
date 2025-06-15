@@ -80,397 +80,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
     }
   }
 
-  Future<void> _updateUser(User user) async {
-    final result = await _showEditUserDialog(user);
-    if (result == true) {
-      await _loadUserData();
-    }
-  }
-
-  Future<bool?> _showEditUserDialog(User user) async {
-    final usernameController = TextEditingController(text: user.username);
-    final emailController = TextEditingController(text: user.email);
-    final fullNameController = TextEditingController(text: user.fullName);
-    final passwordController = TextEditingController();
-    
-    bool isAdmin = user.isAdmin;
-    String? profileImagePath = user.profileImagePath;
-    bool changePassword = false;
-
-    return await showDialog<bool>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Row(
-            children: [
-              const Icon(Icons.edit, color: AppColors.primary),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Edit User: ${user.username}',
-                  style: const TextStyle(fontSize: 16),
-                ),
-              ),
-            ],
-          ),
-          content: SizedBox(
-            width: MediaQuery.of(context).size.width * 0.9,
-            height: MediaQuery.of(context).size.height * 0.7,
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Profile Image Section
-                  Center(
-                    child: Column(
-                      children: [
-                        Container(
-                          width: 100,
-                          height: 100,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(color: AppColors.primary, width: 3),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.grey.withOpacity(0.3),
-                                spreadRadius: 2,
-                                blurRadius: 5,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: ClipOval(
-                            child: _buildProfileImage(profileImagePath, user.fullName),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'ID: ${user.id}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 24),
-                  
-                  // Basic Information Section
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Text(
-                      '👤 Informasi Dasar',
-                      style: TextStyle(
-                        fontSize: 14, 
-                        fontWeight: FontWeight.bold, 
-                        color: AppColors.primary
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Username Field
-                  TextField(
-                    controller: usernameController,
-                    decoration: InputDecoration(
-                      labelText: 'Username *',
-                      prefixIcon: const Icon(Icons.person),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Full Name Field
-                  TextField(
-                    controller: fullNameController,
-                    decoration: InputDecoration(
-                      labelText: 'Nama Lengkap *',
-                      prefixIcon: const Icon(Icons.badge),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Email Field
-                  TextField(
-                    controller: emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: InputDecoration(
-                      labelText: 'Email *',
-                      prefixIcon: const Icon(Icons.email),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  
-                  // Security Section
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Text(
-                      '🔐 Keamanan & Akses',
-                      style: TextStyle(
-                        fontSize: 14, 
-                        fontWeight: FontWeight.bold, 
-                        color: AppColors.primary
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Admin Switch
-                  Container(
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey[300]!),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.admin_panel_settings, color: AppColors.primary),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Status Admin',
-                                style: TextStyle(fontWeight: FontWeight.w600),
-                              ),
-                              Text(
-                                'Berikan akses administrator',
-                                style: TextStyle(fontSize: 12, color: Colors.grey),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Switch(
-                          value: isAdmin,
-                          onChanged: (value) {
-                            setDialogState(() => isAdmin = value);
-                          },
-                          activeColor: AppColors.primary,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Change Password Switch
-                  Container(
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey[300]!),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.lock_reset, color: Colors.orange),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Ubah Password',
-                                style: TextStyle(fontWeight: FontWeight.w600),
-                              ),
-                              Text(
-                                'Reset kata sandi pengguna',
-                                style: TextStyle(fontSize: 12, color: Colors.grey),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Switch(
-                          value: changePassword,
-                          onChanged: (value) {
-                            setDialogState(() => changePassword = value);
-                            if (!value) {
-                              passwordController.clear();
-                            }
-                          },
-                          activeColor: Colors.orange,
-                        ),
-                      ],
-                    ),
-                  ),
-                  
-                  // Password Field (if change password is enabled)
-                  if (changePassword) ...[
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: passwordController,
-                      obscureText: true,
-                      decoration: InputDecoration(
-                        labelText: 'Password Baru *',
-                        hintText: 'Masukkan password baru',
-                        prefixIcon: const Icon(Icons.lock),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                    ),
-                  ],
-                  
-                  const SizedBox(height: 24),
-                  
-                  // Account Info Section
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'ℹ️ Informasi Akun',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Terdaftar: ${_formatDate(user.createdAt)}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                        Text(
-                          'User ID: ${user.id}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  Text(
-                    '* Field wajib diisi',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Batal'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (_validateUserForm(
-                  usernameController.text,
-                  emailController.text,
-                  fullNameController.text,
-                  changePassword,
-                  passwordController.text,
-                )) {
-                  await _saveUserChanges(
-                    user,
-                    usernameController.text,
-                    emailController.text,
-                    fullNameController.text,
-                    isAdmin,
-                    changePassword,
-                    passwordController.text,
-                  );
-                  Navigator.pop(context, true);
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Simpan Perubahan'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  bool _validateUserForm(String username, String email, String fullName, 
-                        bool changePassword, String password) {
-    if (username.trim().isEmpty) {
-      _showErrorSnackBar('Username harus diisi');
-      return false;
-    }
-    if (email.trim().isEmpty) {
-      _showErrorSnackBar('Email harus diisi');
-      return false;
-    }
-    if (fullName.trim().isEmpty) {
-      _showErrorSnackBar('Nama lengkap harus diisi');
-      return false;
-    }
-    if (!_isValidEmail(email)) {
-      _showErrorSnackBar('Format email tidak valid');
-      return false;
-    }
-    if (changePassword && password.trim().isEmpty) {
-      _showErrorSnackBar('Password baru harus diisi');
-      return false;
-    }
-    if (changePassword && password.length < 6) {
-      _showErrorSnackBar('Password minimal 6 karakter');
-      return false;
-    }
-    return true;
-  }
-
-  bool _isValidEmail(String email) {
-    return RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(email);
-  }
-
-  Future<void> _saveUserChanges(User user, String username, String email, 
-                               String fullName, bool isAdmin, 
-                               bool changePassword, String password) async {
-    try {
-      print('=== SAVING USER CHANGES ===');
-      print('User ID: ${user.id}');
-      print('New Username: $username');
-      print('New Email: $email');
-      print('New Full Name: $fullName');
-      print('New Admin Status: $isAdmin');
-      print('Change Password: $changePassword');
-      
-      // In a real app, you would update the database here
-      // await DatabaseHelper.instance.updateUser(user.id, ...);
-      
-      _showSuccessSnackBar('✅ User "${username}" berhasil diperbarui');
-      
-    } catch (e) {
-      print('Error saving user changes: $e');
-      _showErrorSnackBar('❌ Error: ${e.toString()}');
-    }
-  }
-
+  // ✅ IMPLEMENTASI _deleteUser METHOD YANG LENGKAP
   Future<void> _deleteUser(User user) async {
     final confirm = await _showConfirmDialog(
       'Hapus User',
@@ -485,21 +95,46 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
         print('User ID: ${user.id}');
         print('Username: ${user.username}');
         
-        // In a real app, you would delete from database here
-        // await DatabaseHelper.instance.deleteUser(user.id);
+        // Show loading dialog
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(
+            child: CircularProgressIndicator(color: AppColors.primary),
+          ),
+        );
         
-        _showSuccessSnackBar('✅ User "${user.username}" berhasil dihapus');
-        await _loadUserData();
+        // Delete from database
+        final result = await DatabaseHelper.instance.deleteUser(user.id!);
+        
+        // Hide loading dialog
+        Navigator.pop(context);
+        
+        if (result > 0) {
+          print('✅ User deleted successfully from database');
+          _showSuccessSnackBar('✅ User "${user.username}" berhasil dihapus');
+          await _loadUserData(); // Refresh data setelah delete
+        } else {
+          throw Exception('User tidak ditemukan atau sudah terhapus');
+        }
+        
       } catch (e) {
-        print('Error deleting user: $e');
+        // Hide loading dialog if still showing
+        if (Navigator.canPop(context)) {
+          Navigator.pop(context);
+        }
+        
+        print('❌ Error deleting user: $e');
         _showErrorSnackBar('❌ Error: ${e.toString()}');
       }
     }
   }
 
+  // ✅ IMPLEMENTASI _showConfirmDialog METHOD
   Future<bool> _showConfirmDialog(String title, String content, String actionText, Color actionColor) async {
     return await showDialog<bool>(
       context: context,
+      barrierDismissible: false, // Tidak bisa ditutup dengan tap di luar
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
@@ -510,46 +145,100 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
               color: actionColor,
             ),
             const SizedBox(width: 8),
-            Expanded(child: Text(title)),
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
           ],
         ),
-        content: Text(content),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              content,
+              style: const TextStyle(fontSize: 14, height: 1.4),
+            ),
+            if (actionColor == Colors.red) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Colors.red.withOpacity(0.3),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.warning,
+                      color: Colors.red,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Peringatan: Tindakan ini tidak dapat dikembalikan!',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.red[700],
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Batal'),
+            child: const Text(
+              'Batal',
+              style: TextStyle(color: Colors.grey),
+            ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: actionColor,
               foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             child: Text(actionText),
           ),
         ],
       ),
-    ) ?? false;
+    ) ?? false; // Return false jika dialog ditutup tanpa pilihan
   }
 
-  List<User> _getFilteredUsers(List<User> users) {
-    if (searchQuery.isEmpty) return users;
-
-    return users.where((user) {
-      final searchLower = searchQuery.toLowerCase();
-      return user.username.toLowerCase().contains(searchLower) ||
-             user.email.toLowerCase().contains(searchLower) ||
-             user.fullName.toLowerCase().contains(searchLower);
-    }).toList();
-  }
-
+  // ✅ IMPLEMENTASI HELPER METHODS UNTUK SNACKBAR
   void _showSuccessSnackBar(String message) {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(message),
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Expanded(child: Text(message)),
+            ],
+          ),
           backgroundColor: Colors.green,
           behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 3),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
         ),
       );
     }
@@ -559,12 +248,34 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(message),
+          content: Row(
+            children: [
+              const Icon(Icons.error, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Expanded(child: Text(message)),
+            ],
+          ),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 4),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
         ),
       );
     }
+  }
+
+  // ✅ IMPLEMENTASI _getFilteredUsers METHOD
+  List<User> _getFilteredUsers(List<User> users) {
+    if (searchQuery.isEmpty) return users;
+
+    return users.where((user) {
+      final searchLower = searchQuery.toLowerCase();
+      return user.username.toLowerCase().contains(searchLower) ||
+             user.email.toLowerCase().contains(searchLower) ||
+             user.fullName.toLowerCase().contains(searchLower);
+    }).toList();
   }
 
   @override
@@ -688,6 +399,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
     );
   }
 
+  // ✅ PERBAIKI: Method _buildUsersList dengan kurung kurawal yang benar
   Widget _buildUsersList(List<User> users, String type) {
     if (users.isEmpty) {
       return RefreshIndicator(
@@ -748,7 +460,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
         },
       ),
     );
-  }
+  } // ✅ PERBAIKI: Tutup method dengan benar
 
   Widget _buildUserCard(User user, String type) {
     return Card(
@@ -853,7 +565,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
             
             const SizedBox(height: 16),
             
-            // Action Buttons
+            // ✅ Action Buttons - HAPUS TOMBOL EDIT, HANYA DETAIL DAN HAPUS
             Row(
               children: [
                 Expanded(
@@ -871,23 +583,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _updateUser(user),
-                    icon: const Icon(Icons.edit, size: 16),
-                    label: const Text('Edit'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () => _deleteUser(user),
@@ -911,159 +607,192 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
     );
   }
 
+  // ✅ IMPLEMENTASI METHOD YANG MASIH KURANG
   void _showUserDetail(User user) {
+    bool showPassword = false; // State untuk toggle password visibility
+    
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: user.isAdmin ? Colors.orange : AppColors.primary,
-                  width: 2,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: user.isAdmin ? Colors.orange : AppColors.primary,
+                    width: 2,
+                  ),
+                ),
+                child: ClipOval(
+                  child: _buildProfileImage(user.profileImagePath, user.fullName),
                 ),
               ),
-              child: ClipOval(
-                child: _buildProfileImage(user.profileImagePath, user.fullName),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      user.fullName,
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      '@${user.username}',
+                      style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
+            ],
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    user.fullName,
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    '@${user.username}',
-                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Profile Image (larger)
-                Center(
-                  child: Container(
-                    width: 150,
-                    height: 150,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: user.isAdmin ? Colors.orange : AppColors.primary,
-                        width: 4,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.withOpacity(0.3),
-                          spreadRadius: 2,
-                          blurRadius: 5,
-                          offset: const Offset(0, 2),
+                  // Profile Image (larger)
+                  Center(
+                    child: Container(
+                      width: 120,
+                      height: 120,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: user.isAdmin ? Colors.orange : AppColors.primary,
+                          width: 4,
                         ),
-                      ],
-                    ),
-                    child: ClipOval(
-                      child: _buildProfileImage(user.profileImagePath, user.fullName),
-                    ),
-                  ),
-                ),
-                
-                const SizedBox(height: 24),
-                
-                // User Details
-                _buildDetailRow(Icons.fingerprint, 'User ID', user.id.toString()),
-                const SizedBox(height: 12),
-                _buildDetailRow(Icons.person, 'Username', user.username),
-                const SizedBox(height: 12),
-                _buildDetailRow(Icons.badge, 'Nama Lengkap', user.fullName),
-                const SizedBox(height: 12),
-                _buildDetailRow(Icons.email, 'Email', user.email),
-                const SizedBox(height: 12),
-                _buildDetailRow(
-                  Icons.admin_panel_settings, 
-                  'Status', 
-                  user.isAdmin ? 'Administrator' : 'Pengguna Biasa',
-                ),
-                const SizedBox(height: 12),
-                _buildDetailRow(Icons.access_time, 'Terdaftar', _formatDetailDate(user.createdAt)),
-                
-                if (user.profileImagePath != null && user.profileImagePath!.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  _buildDetailRow(Icons.image, 'Foto Profil', 'Ada'),
-                ],
-                
-                const SizedBox(height: 16),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: (user.isAdmin ? Colors.orange : AppColors.primary).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            user.isAdmin ? Icons.admin_panel_settings : Icons.person,
-                            color: user.isAdmin ? Colors.orange : AppColors.primary,
-                            size: 16,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            user.isAdmin ? 'Akses Administrator' : 'Akses Pengguna Biasa',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: user.isAdmin ? Colors.orange[700] : AppColors.primary,
-                            ),
-                          ),
-                        ],
                       ),
-                      const SizedBox(height: 4),
+                      child: ClipOval(
+                        child: _buildProfileImage(user.profileImagePath, user.fullName),
+                      ),
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 24),
+                  
+                  // User Details
+                  _buildDetailRow(Icons.fingerprint, 'User ID', user.id.toString()),
+                  const SizedBox(height: 12),
+                  _buildDetailRow(Icons.person, 'Username', user.username),
+                  const SizedBox(height: 12),
+                  _buildDetailRow(Icons.badge, 'Nama Lengkap', user.fullName),
+                  const SizedBox(height: 12),
+                  _buildDetailRow(Icons.email, 'Email', user.email),
+                  const SizedBox(height: 12),
+                  
+                  // ✅ TAMBAH: Password Row dengan Toggle Visibility
+                  Row(
+                    children: [
+                      Icon(Icons.lock, size: 14, color: Colors.grey[600]),
+                      const SizedBox(width: 6),
                       Text(
-                        user.isAdmin 
-                            ? 'Memiliki akses penuh ke panel administrasi'
-                            : 'Dapat menggunakan fitur dasar aplikasi',
+                        'Password: ',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey[600],
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                showPassword ? user.password : '•' * user.password.length,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                  fontFamily: showPassword ? null : 'monospace',
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: () {
+                                setDialogState(() {
+                                  showPassword = !showPassword;
+                                });
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Icon(
+                                  showPassword ? Icons.visibility_off : Icons.visibility,
+                                  size: 16,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
-                ),
-              ],
+                  const SizedBox(height: 12),
+                  
+                  _buildDetailRow(
+                    Icons.admin_panel_settings, 
+                    'Status', 
+                    user.isAdmin ? 'Administrator' : 'Pengguna Biasa',
+                  ),
+                  const SizedBox(height: 12),
+                  _buildDetailRow(Icons.access_time, 'Terdaftar', _formatDate(user.createdAt)),
+                  
+                  // ✅ TAMBAH: Security Warning untuk Password
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: Colors.orange.withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.security,
+                          color: Colors.orange[700],
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Password ditampilkan untuk keperluan administrasi. Jaga kerahasiaan informasi ini.',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.orange[700],
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-        actions: [
-          if (user.profileImagePath != null && user.profileImagePath!.isNotEmpty)
+          actions: [
             TextButton(
-              onPressed: () => _showFullSizeProfileImage(user.profileImagePath!, user.fullName),
-              child: const Text('Lihat Foto'),
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Tutup'),
             ),
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Tutup'),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1077,17 +806,6 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
             fit: BoxFit.cover,
             errorBuilder: (context, error, stackTrace) {
               return _buildAvatarFallback(fullName);
-            },
-            loadingBuilder: (context, child, loadingProgress) {
-              if (loadingProgress == null) return child;
-              return Center(
-                child: CircularProgressIndicator(
-                  value: loadingProgress.expectedTotalBytes != null
-                      ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
-                      : null,
-                  strokeWidth: 2,
-                ),
-              );
             },
           );
         } else {
@@ -1124,45 +842,6 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
     );
   }
 
-  void _showFullSizeProfileImage(String imagePath, String fullName) {
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.black87,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AppBar(
-              title: Text(
-                'Foto Profil - $fullName',
-                style: const TextStyle(color: Colors.white),
-              ),
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              leading: IconButton(
-                icon: const Icon(Icons.close, color: Colors.white),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ),
-            Expanded(
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                child: InteractiveViewer(
-                  panEnabled: true,
-                  boundaryMargin: const EdgeInsets.all(20),
-                  minScale: 0.5,
-                  maxScale: 4.0,
-                  child: _buildProfileImage(imagePath, fullName),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildDetailRow(IconData icon, String label, String value) {
     return Row(
       children: [
@@ -1192,14 +871,5 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
 
   String _formatDate(DateTime date) {
     return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
-  }
-
-  String _formatDetailDate(DateTime date) {
-    const months = [
-      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
-    ];
-    
-    return '${date.day} ${months[date.month - 1]} ${date.year}';
   }
 }

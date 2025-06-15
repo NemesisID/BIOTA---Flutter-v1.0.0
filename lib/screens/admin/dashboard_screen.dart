@@ -26,11 +26,53 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // Fun fact data
   Map<String, dynamic>? currentFunFact;
   bool isLoadingFunFact = false;
+  
+  // ✅ TAMBAH: Loading states untuk refresh
+  bool isLoadingStats = false;
 
   @override
   void initState() {
     super.initState();
     _loadDashboardData();
+  }
+
+  // ✅ TAMBAH: Method untuk refresh data dashboard
+  Future<void> _refreshDashboardData() async {
+    print('=== REFRESHING DASHBOARD DATA ===');
+    setState(() => isLoadingStats = true);
+    
+    try {
+      await Future.wait([
+        _loadStats(),
+        _loadFunFact(),
+      ]);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Data dashboard berhasil diperbarui'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error refreshing dashboard: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => isLoadingStats = false);
+      }
+    }
   }
 
   Future<void> _loadDashboardData() async {
@@ -40,14 +82,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _loadStats() async {
     try {
+      print('Loading dashboard stats...');
       final speciesStats = await DatabaseHelper.instance.getSpeciesStats();
       final userStats = await DatabaseHelper.instance.getUserStats();
       
-      setState(() {
-        totalSpecies = speciesStats['total'] ?? 0;
-        pendingSpecies = speciesStats['pending'] ?? 0;
-        totalUsers = userStats['total'] ?? 0;
-      });
+      if (mounted) {
+        setState(() {
+          totalSpecies = speciesStats['total'] ?? 0;
+          pendingSpecies = speciesStats['pending'] ?? 0;
+          totalUsers = userStats['total'] ?? 0;
+        });
+      }
+      print('Stats loaded - Species: $totalSpecies, Pending: $pendingSpecies, Users: $totalUsers');
     } catch (e) {
       print('Error loading stats: $e');
     }
@@ -57,14 +103,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     setState(() => isLoadingFunFact = true);
     try {
       final funFact = await DatabaseHelper.instance.getFunFact();
-      setState(() {
-        currentFunFact = funFact;
-        isLoadingFunFact = false;
-      });
+      if (mounted) {
+        setState(() {
+          currentFunFact = funFact;
+          isLoadingFunFact = false;
+        });
+      }
       print('Loaded fun fact: $funFact');
     } catch (e) {
       print('Error loading fun fact: $e');
-      setState(() => isLoadingFunFact = false);
+      if (mounted) {
+        setState(() => isLoadingFunFact = false);
+      }
     }
   }
 
@@ -112,6 +162,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         backgroundColor: AppColors.primary,
         elevation: 0,
+        // ✅ TAMBAH: Action button untuk refresh
+        actions: _selectedIndex == 0 ? [
+          IconButton(
+            onPressed: isLoadingStats ? null : _refreshDashboardData,
+            icon: isLoadingStats 
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : const Icon(Icons.refresh, color: Colors.white),
+            tooltip: 'Refresh Data',
+          ),
+        ] : null,
       ),
       drawer: _buildDrawer(),
       body: _getSelectedScreen(),
@@ -287,284 +354,324 @@ class _DashboardScreenState extends State<DashboardScreen> {
       case 0: return _buildDashboardHome();
       case 1: return const SpeciesManagementScreen();
       case 2: return const EventManagementScreen();
-      case 3: return const UserManagementScreen(); // ✅ TAMBAH USER MANAGEMENT
+      case 3: return const UserManagementScreen();
       default: return _buildDashboardHome();
     }
   }
 
-  Widget _buildPlaceholderScreen(String title) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.construction,
-            size: 80,
-            color: Colors.grey[400],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            '$title Screen',
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Fitur ini sedang dalam pengembangan',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[600],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildDashboardHome() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Welcome Section
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  AppColors.primary.withOpacity(0.1),
-                  AppColors.secondary.withOpacity(0.1),
+    // ✅ TAMBAH: RefreshIndicator untuk dashboard home
+    return RefreshIndicator(
+      color: AppColors.primary,
+      onRefresh: _refreshDashboardData,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(), // ✅ PENTING: Pastikan bisa di-scroll meski konten pendek
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Welcome Section
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppColors.primary.withOpacity(0.1),
+                    AppColors.secondary.withOpacity(0.1),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: AppColors.primary.withOpacity(0.2),
+                  width: 1,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.admin_panel_settings,
+                          color: Colors.white,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Selamat Datang!',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            Text(
+                              'Panel Administrasi BIOTA',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // ✅ TAMBAH: Loading indicator untuk stats
+                      if (isLoadingStats)
+                        const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Kelola data spesies, event, pengguna, dan konten fun facts untuk aplikasi BIOTA',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[700],
+                      height: 1.4,
+                    ),
+                  ),
+                  // ✅ TAMBAH: Pull to refresh hint
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.refresh,
+                          size: 14,
+                          color: AppColors.primary,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Tarik ke bawah untuk refresh data',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.primary,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: AppColors.primary.withOpacity(0.2),
-                width: 1,
-              ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            
+            const SizedBox(height: 24),
+            
+            // Fun Fact Management Section
+            Row(
+              children: [
+                const Text(
+                  'Fun Fact Hari Ini',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  onPressed: _showEditFunFactDialog,
+                  icon: const Icon(
+                    Icons.edit,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
+                  tooltip: 'Edit Fun Fact',
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            
+            _buildFunFactCard(),
+            
+            const SizedBox(height: 24),
+            
+            // Statistics Cards
+            Row(
+              children: [
+                const Text(
+                  'Statistik Aplikasi',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const Spacer(),
+                // ✅ TAMBAH: Timestamp last update
+                if (!isLoadingStats)
+                  Text(
+                    'Terakhir diperbarui: ${_getCurrentTime()}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey[600],
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            
+            // Statistics Cards dengan loading state
+            Column(
               children: [
                 Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.admin_panel_settings,
-                        color: Colors.white,
-                        size: 24,
+                    Expanded(
+                      child: _buildStatCard(
+                        title: 'Total Spesies',
+                        value: isLoadingStats ? '...' : totalSpecies.toString(),
+                        icon: Icons.pets,
+                        color: Colors.green,
+                        onTap: () => setState(() => _selectedIndex = 1),
+                        isLoading: isLoadingStats,
                       ),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Selamat Datang!',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                          Text(
-                            'Panel Administrasi BIOTA',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
+                      child: _buildStatCard(
+                        title: 'Menunggu Review',
+                        value: isLoadingStats ? '...' : pendingSpecies.toString(),
+                        icon: Icons.pending_actions,
+                        color: Colors.orange,
+                        badge: !isLoadingStats && pendingSpecies > 0,
+                        onTap: () => setState(() => _selectedIndex = 1),
+                        isLoading: isLoadingStats,
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 16),
-                Text(
-                  'Kelola data spesies, event, pengguna, dan konten fun facts untuk aplikasi BIOTA',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[700],
-                    height: 1.4,
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildStatCard(
+                        title: 'Total Pengguna',
+                        value: isLoadingStats ? '...' : totalUsers.toString(),
+                        icon: Icons.people,
+                        color: Colors.blue,
+                        onTap: () => setState(() => _selectedIndex = 3),
+                        isLoading: isLoadingStats,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _buildStatCard(
+                        title: 'Event Aktif',
+                        value: totalEvents.toString(),
+                        icon: Icons.event,
+                        color: Colors.purple,
+                        onTap: () => setState(() => _selectedIndex = 2),
+                        isLoading: false, // Event tidak perlu loading karena data dummy
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            
+            const SizedBox(height: 24),
+            
+            // Quick Actions
+            const Text(
+              'Aksi Cepat',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 16),
+            
+            Row(
+              children: [
+                Expanded(
+                  child: _buildQuickAction(
+                    title: 'Review Spesies',
+                    subtitle: '$pendingSpecies menunggu',
+                    icon: Icons.rate_review,
+                    color: Colors.orange,
+                    onTap: () => setState(() => _selectedIndex = 1),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildQuickAction(
+                    title: 'Buat Event',
+                    subtitle: 'Event baru',
+                    icon: Icons.add_circle,
+                    color: Colors.green,
+                    onTap: () => setState(() => _selectedIndex = 2),
                   ),
                 ),
               ],
             ),
-          ),
-          
-          const SizedBox(height: 24),
-          
-          // Fun Fact Management Section
-          Row(
-            children: [
-              const Text(
-                'Fun Fact Hari Ini',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+            
+            const SizedBox(height: 16),
+            
+            Row(
+              children: [
+                Expanded(
+                  child: _buildQuickAction(
+                    title: 'Update Fun Fact',
+                    subtitle: 'Edit konten',
+                    icon: Icons.lightbulb_outline,
+                    color: Colors.blue,
+                    onTap: _showEditFunFactDialog,
+                  ),
                 ),
-              ),
-              const Spacer(),
-              IconButton(
-                onPressed: _showEditFunFactDialog,
-                icon: const Icon(
-                  Icons.edit,
-                  color: AppColors.primary,
-                  size: 20,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildQuickAction(
+                    title: 'Kelola User',
+                    subtitle: 'Atur pengguna',
+                    icon: Icons.manage_accounts,
+                    color: Colors.purple,
+                    onTap: () => setState(() => _selectedIndex = 3),
+                  ),
                 ),
-                tooltip: 'Edit Fun Fact',
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          
-          _buildFunFactCard(),
-          
-          const SizedBox(height: 24),
-          
-          // Statistics Cards
-          const Text(
-            'Statistik Aplikasi',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
+              ],
             ),
-          ),
-          const SizedBox(height: 16),
-          
-          // ✅ FIXED: GANTI GridView DENGAN COLUMN DAN ROW UNTUK KONTROL LEBIH BAIK
-          Column(
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildStatCard(
-                      title: 'Total Spesies',
-                      value: totalSpecies.toString(),
-                      icon: Icons.pets,
-                      color: Colors.green,
-                      onTap: () => setState(() => _selectedIndex = 1),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildStatCard(
-                      title: 'Menunggu Review',
-                      value: pendingSpecies.toString(),
-                      icon: Icons.pending_actions,
-                      color: Colors.orange,
-                      badge: pendingSpecies > 0,
-                      onTap: () => setState(() => _selectedIndex = 1),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildStatCard(
-                      title: 'Total Pengguna',
-                      value: totalUsers.toString(),
-                      icon: Icons.people,
-                      color: Colors.blue,
-                      onTap: () => setState(() => _selectedIndex = 3),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildStatCard(
-                      title: 'Event Aktif',
-                      value: totalEvents.toString(),
-                      icon: Icons.event,
-                      color: Colors.purple,
-                      onTap: () => setState(() => _selectedIndex = 2),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: 24),
-          
-          // Quick Actions
-          const Text(
-            'Aksi Cepat',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 16),
-          
-          Row(
-            children: [
-              Expanded(
-                child: _buildQuickAction(
-                  title: 'Review Spesies',
-                  subtitle: '$pendingSpecies menunggu',
-                  icon: Icons.rate_review,
-                  color: Colors.orange,
-                  onTap: () => setState(() => _selectedIndex = 1),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildQuickAction(
-                  title: 'Buat Event',
-                  subtitle: 'Event baru',
-                  icon: Icons.add_circle,
-                  color: Colors.green,
-                  onTap: () => setState(() => _selectedIndex = 2),
-                ),
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: 16),
-          
-          Row(
-            children: [
-              Expanded(
-                child: _buildQuickAction(
-                  title: 'Update Fun Fact',
-                  subtitle: 'Edit konten',
-                  icon: Icons.lightbulb_outline,
-                  color: Colors.blue,
-                  onTap: _showEditFunFactDialog,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildQuickAction(
-                  title: 'Kelola User',
-                  subtitle: 'Atur pengguna',
-                  icon: Icons.manage_accounts,
-                  color: Colors.purple,
-                  onTap: () => setState(() => _selectedIndex = 3),
-                ),
-              ),
-            ],
-          ),
-        ],
+            
+            // ✅ TAMBAH: Extra space agar scroll bisa sampai bawah
+            const SizedBox(height: 100),
+          ],
+        ),
       ),
     );
+  }
+
+  // ✅ TAMBAH: Method untuk mendapatkan waktu sekarang
+  String _getCurrentTime() {
+    final now = DateTime.now();
+    return '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
   }
 
   Widget _buildFunFactCard() {
@@ -1063,7 +1170,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  // ✅ FIXED: PERBAIKI STAT CARD DENGAN TINGGI YANG CUKUP
   Widget _buildStatCard({
     required String title,
     required String value,
@@ -1071,11 +1177,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     required Color color,
     bool badge = false,
     VoidCallback? onTap,
+    bool isLoading = false, // ✅ TAMBAH: Parameter loading
   }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 90, // ✅ TENTUKAN TINGGI TETAP UNTUK MENGHINDARI OVERFLOW
+        height: 90,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: Colors.white,
@@ -1091,7 +1198,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween, // ✅ DISTRIBUSI RUANG MERATA
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1113,6 +1220,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       shape: BoxShape.circle,
                     ),
                   ),
+                // ✅ TAMBAH: Loading indicator untuk card
+                if (isLoading)
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(color),
+                    ),
+                  ),
               ],
             ),
             Column(
@@ -1121,7 +1238,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Text(
                   value,
                   style: const TextStyle(
-                    fontSize: 18, // ✅ KURANGI SEDIKIT UKURAN FONT
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: AppColors.textPrimary,
                   ),
@@ -1133,7 +1250,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     fontSize: 10,
                     color: Colors.grey[600],
                   ),
-                  maxLines: 2, // ✅ IZINKAN 2 BARIS UNTUK JUDUL PANJANG
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
@@ -1253,7 +1370,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       case 0: return 'Dashboard';
       case 1: return 'Kelola Spesies';
       case 2: return 'Kelola Event';
-      case 3: return 'Kelola User'; // ✅ TITLE UNTUK USER MANAGEMENT
+      case 3: return 'Kelola User';
       default: return 'Dashboard';
     }
   }

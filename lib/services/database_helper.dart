@@ -28,7 +28,7 @@ class DatabaseHelper {
   }
 
   Future<void> _createDB(Database db, int version) async {
-    // Tabel users
+    // Tabel users - ✅ PASTIKAN FIELD NAME SESUAI
     await db.execute('''
       CREATE TABLE users(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -307,14 +307,158 @@ class DatabaseHelper {
     return null;
   }
 
+  // ✅ SATU METHOD updateUser YANG COMPREHENSIVE
   Future<int> updateUser(User user) async {
-    final db = await database;
-    return await db.update(
-      'users',
-      user.toMap(),
-      where: 'id = ?',
-      whereArgs: [user.id],
-    );
+    try {
+      final db = await database;
+      
+      print('=== UPDATING USER IN DATABASE ===');
+      print('User ID: ${user.id}');
+      print('Username: ${user.username}');
+      print('Email: ${user.email}');
+      print('Full Name: ${user.fullName}');
+      print('Is Admin: ${user.isAdmin}');
+      
+      // Check if user exists first
+      final existingUser = await db.query(
+        'users',
+        where: 'id = ?',
+        whereArgs: [user.id],
+      );
+      
+      if (existingUser.isEmpty) {
+        throw Exception('User dengan ID ${user.id} tidak ditemukan');
+      }
+      
+      // Check if new username/email already exists (exclude current user)
+      final duplicateUsername = await db.query(
+        'users',
+        where: 'username = ? AND id != ?',
+        whereArgs: [user.username, user.id],
+      );
+      
+      if (duplicateUsername.isNotEmpty) {
+        throw Exception('Username "${user.username}" sudah digunakan oleh user lain');
+      }
+      
+      final duplicateEmail = await db.query(
+        'users',
+        where: 'email = ? AND id != ?',
+        whereArgs: [user.email, user.id],
+      );
+      
+      if (duplicateEmail.isNotEmpty) {
+        throw Exception('Email "${user.email}" sudah digunakan oleh user lain');
+      }
+      
+      // Update user
+      final result = await db.update(
+        'users',
+        user.toMap(),
+        where: 'id = ?',
+        whereArgs: [user.id],
+      );
+      
+      print('Update result: $result row(s) affected');
+      
+      if (result == 0) {
+        throw Exception('Gagal mengupdate user - tidak ada baris yang terpengaruh');
+      }
+      
+      return result;
+      
+    } catch (e) {
+      print('Error updating user: $e');
+      rethrow;
+    }
+  }
+
+  // ✅ METHOD TERPISAH UNTUK UPDATE ADMIN (opsional, lebih spesifik)
+  Future<int> updateUserByAdmin({
+    required int id,
+    required String username,
+    required String email,
+    required String fullName,
+    required bool isAdmin,
+    String? password, // Optional - hanya update jika tidak null
+  }) async {
+    try {
+      final db = await database;
+      
+      print('=== UPDATING USER BY ADMIN ===');
+      print('User ID: $id');
+      print('New Username: $username');
+      print('New Email: $email');
+      print('New Full Name: $fullName');
+      print('New Admin Status: $isAdmin');
+      print('Update Password: ${password != null && password.isNotEmpty}');
+      
+      // Check if user exists first
+      final existingUser = await db.query(
+        'users',
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+      
+      if (existingUser.isEmpty) {
+        throw Exception('User dengan ID $id tidak ditemukan');
+      }
+      
+      // Check if new username/email already exists (exclude current user)
+      final duplicateUsername = await db.query(
+        'users',
+        where: 'username = ? AND id != ?',
+        whereArgs: [username, id],
+      );
+      
+      if (duplicateUsername.isNotEmpty) {
+        throw Exception('Username "$username" sudah digunakan oleh user lain');
+      }
+      
+      final duplicateEmail = await db.query(
+        'users',
+        where: 'email = ? AND id != ?',
+        whereArgs: [email, id],
+      );
+      
+      if (duplicateEmail.isNotEmpty) {
+        throw Exception('Email "$email" sudah digunakan oleh user lain');
+      }
+      
+      // Prepare update data
+      Map<String, dynamic> updateData = {
+        'username': username,
+        'email': email,
+        'fullName': fullName,
+        'isAdmin': isAdmin ? 1 : 0,
+      };
+      
+      // Only add password if it's being changed
+      if (password != null && password.isNotEmpty) {
+        updateData['password'] = password;
+        print('Password will be updated');
+      }
+      
+      // Update user
+      final result = await db.update(
+        'users',
+        updateData,
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+      
+      print('Update result: $result row(s) affected');
+      
+      if (result == 0) {
+        throw Exception('Gagal mengupdate user - tidak ada baris yang terpengaruh');
+      }
+      
+      return result;
+      
+    } catch (e) {
+      print('Error updating user by admin: $e');
+      rethrow;
+    }
   }
 
   Future<int> updateUserProfile(User user) async {
@@ -378,21 +522,55 @@ class DatabaseHelper {
   }
 
   Future<int> deleteUser(int userId) async {
-    final db = await database;
-    
-    // Hapus semua data spesies yang dimiliki user ini terlebih dahulu
-    await db.delete(
-      'data',
-      where: 'userId = ?',
-      whereArgs: [userId],
-    );
-    
-    // Kemudian hapus user
-    return await db.delete(
-      'users',
-      where: 'id = ?',
-      whereArgs: [userId],
-    );
+    try {
+      final db = await database;
+      
+      print('=== DELETING USER FROM DATABASE ===');
+      print('User ID: $userId');
+      
+      // Check if user exists first
+      final existingUser = await db.query(
+        'users',
+        where: 'id = ?',
+        whereArgs: [userId],
+      );
+      
+      if (existingUser.isEmpty) {
+        throw Exception('User dengan ID $userId tidak ditemukan');
+      }
+      
+      final userData = existingUser.first;
+      print('Deleting user: ${userData['username']} (${userData['email']})');
+      
+      // Begin transaction to delete user and related data
+      return await db.transaction((txn) async {
+        // 1. Delete user's species data
+        final speciesDeleted = await txn.delete(
+          'data',
+          where: 'userId = ?',
+          whereArgs: [userId],
+        );
+        print('Deleted $speciesDeleted species records for user $userId');
+        
+        // 2. Finally delete the user
+        final userDeleted = await txn.delete(
+          'users',
+          where: 'id = ?',
+          whereArgs: [userId],
+        );
+        
+        if (userDeleted == 0) {
+          throw Exception('Gagal menghapus user - tidak ada baris yang terpengaruh');
+        }
+        
+        print('Deleted user: $userDeleted row(s) affected');
+        return userDeleted;
+      });
+      
+    } catch (e) {
+      print('Error deleting user: $e');
+      rethrow;
+    }
   }
 
   // ========== DATA/SPECIES METHODS ==========
@@ -420,7 +598,7 @@ class DatabaseHelper {
     
     // ✅ DEBUG: PRINT RAW QUERY RESULT
     final List<Map<String, dynamic>> maps = await db.query(
-      'species',
+      'data', // ✅ PERBAIKI: gunakan 'data' bukan 'species'
       orderBy: 'createdAt DESC',
     );
     
@@ -563,10 +741,14 @@ class DatabaseHelper {
 
   Future<Map<String, int>> getUserStats() async {
     final db = await database;
-    final totalResult = await db.rawQuery('SELECT COUNT(*) as count FROM users WHERE isAdmin = 0');
+    final totalResult = await db.rawQuery('SELECT COUNT(*) as count FROM users');
+    final adminResult = await db.rawQuery('SELECT COUNT(*) as count FROM users WHERE isAdmin = 1');
+    final regularResult = await db.rawQuery('SELECT COUNT(*) as count FROM users WHERE isAdmin = 0');
     
     return {
       'total': totalResult.first['count'] as int,
+      'admin': adminResult.first['count'] as int,
+      'regular': regularResult.first['count'] as int,
     };
   }
 
@@ -726,7 +908,7 @@ class DatabaseHelper {
   Future<int> updateSpeciesStatus(int id, String status) async {
     final db = await database;
     return await db.update(
-      'species',
+      'data', // ✅ PERBAIKI: gunakan 'data' bukan 'species'
       {'status': status},
       where: 'id = ?',
       whereArgs: [id],
@@ -737,7 +919,7 @@ class DatabaseHelper {
   Future<int> deleteSpecies(int id) async {
     final db = await database;
     return await db.delete(
-      'species',
+      'data', // ✅ PERBAIKI: gunakan 'data' bukan 'species'
       where: 'id = ?',
       whereArgs: [id],
     );
