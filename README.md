@@ -5,7 +5,7 @@
 [![Framework](https://img.shields.io/badge/Framework-Flutter-02569B?logo=flutter)](https://flutter.dev/)
 [![Language](https://img.shields.io/badge/Language-Dart-0175C2?logo=dart)](https://dart.dev/)
 [![Database](https://img.shields.io/badge/Database-SQLite-003B57?logo=sqlite)](https://www.sqlite.org/index.html)
-[![License](https://img.shields.io/github/license/NemesisID/BIOTA---Flutter-v1.0.0)](https://github.com/NemesisID/BIOTA---Flutter-v1.0.0/blob/main/LICENSE) ---
+[![License](https://img.shields.io/github/license/NemesisID/BIOTA---Flutter-v1.0.0)](https://github.com/NemesisID/BIOTA---Flutter-v1.0.0/blob/main/LICENSE)
 
 ## Tentang Proyek 🌿
 
@@ -42,13 +42,53 @@ Proyek BIOTA dibangun dengan fondasi teknologi yang modern dan efisien:
 * [cite_start]**IDE:** [Visual Studio Code (VS Code)](https://code.visualstudio.com/)[cite: 133].
 * [cite_start]**Arsitektur:** Mengadopsi arsitektur berbasis komponen Flutter dengan lapisan Presentation, Business Logic, dan Data.
 
-## Struktur Proyek 📂
+## Instalasi & Setup 🚀
 
-[cite_start]Struktur direktori `lib` kami mengikuti pola organisasi Flutter standar untuk modularitas dan pemeliharaan yang optimal:
-lib/
-├── screens/         # Definisi halaman utama aplikasi (login, home, explore, admin, dll.) 
-├── widgets/         # Komponen UI yang dapat digunakan kembali (bottom nav bar, image crop, dll.) 
-├── models/          # Struktur data (user, data spesies, event, funfact) 
-├── services/        # Logika bisnis dan interaksi data (auth_service, database_helper, data_service) 
-├── constants/       # Konstanta global aplikasi (skema warna) 
-└── main.dart        # Titik masuk aplikasi
+Untuk menjalankan proyek ini secara lokal:
+
+1.  **Clone repositori:**
+    ```bash
+    git clone [https://github.com/NemesisID/BIOTA---Flutter-v1.0.0.git](https://github.com/NemesisID/BIOTA---Flutter-v1.0.0.git)
+    cd BIOTA---Flutter-v1.0.0
+    ```
+2.  **Dapatkan dependensi Flutter:**
+    ```bash
+    flutter pub get
+    ```
+3.  **Jalankan aplikasi:**
+    ```bash
+    flutter run
+    ```
+    (Pastikan Anda memiliki emulator Android yang berjalan atau perangkat fisik yang terhubung dan diatur untuk debugging USB.)
+
+## Rencana Pengembangan Lanjutan (Future Enhancements) 💡
+
+Kami memiliki beberapa ide untuk pengembangan BIOTA di masa depan:
+
+* **Integrasi AI untuk Identifikasi Spesies:** Menerapkan model AI untuk identifikasi otomatis spesies dari foto yang diunggah.
+* **Backend & Sinkronisasi Data:** Pengembangan server backend untuk database terpusat, mendukung skalabilitas dan sinkronisasi data antar perangkat.
+* **Fitur Komunitas yang Lebih Kuat:** Menambahkan forum diskusi, grup tematik, atau sistem pesan antar pengguna.
+* **Notifikasi Real-time:** Notifikasi push untuk update status laporan, event baru, atau berita konservasi penting.
+* **Optimasi Peta Lanjut:** Peningkatan performa pemuatan dan rendering peta untuk data yang sangat besar (misalnya dengan *marker clustering*).
+
+## Tim Pengembang 🧑‍💻👩‍💻
+
+Proyek ini adalah hasil kerja keras dan kolaborasi dari Kelompok 8:
+
+* **Ragil Hidayatulloh**
+* **Debita Faulirisma Garcia**
+* **Annisa Indah Cahyani**
+
+**Dosen Pengampu:**
+* Bapak Iqbal Ramadhani Mukhlis, S.Kom., M.Kom. 
+
+## Lisensi 📄
+
+Proyek ini dilisensikan di bawah [Nama Lisensi Anda, misalnya: MIT License]. Lihat file [LICENSE](LICENSE) untuk detail lebih lanjut. ## Ucapan Terima Kasih 🙏
+
+Kami mengucapkan terima kasih kepada:
+* Universitas Pembangunan Nasional "Veteran" Jawa Timur atas fasilitas dan kesempatan yang diberikan.
+* Bapak Iqbal Ramadhani Mukhlis, S.Kom., M.Kom. atas bimbingan dan arahannya selama pengembangan proyek.
+* Komunitas Flutter dan Font Awesome atas sumber daya open-source yang luar biasa.
+
+---
