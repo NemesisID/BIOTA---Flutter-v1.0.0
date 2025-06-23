@@ -39,7 +39,7 @@ Proyek BIOTA dibangun dengan fondasi teknologi yang modern dan efisien:
 * [cite_start]**Pengambilan Gambar:** [Image Picker](https://pub.dev/packages/image_picker) untuk mengambil foto dari galeri atau kamera.
 * [cite_start]**Peta Interaktif:** [flutter_map](https://pub.dev/packages/flutter_map) menggunakan [OpenStreetMap](https://www.openstreetmap.org/) sebagai penyedia tile peta.
 * [cite_start]**Manajemen State/Autentikasi:** [Shared Preferences](https://pub.dev/packages/shared_preferences) untuk menyimpan status login secara persisten.
-* [cite_start]**IDE:** [Visual Studio Code (VS Code)](https://code.visualstudio.com/)[cite: 133].
+* [cite_start]**IDE:** [Visual Studio Code (VS Code)](https://code.visualstudio.com/).
 * [cite_start]**Arsitektur:** Mengadopsi arsitektur berbasis komponen Flutter dengan lapisan Presentation, Business Logic, dan Data.
 
 ## Instalasi & Setup 🚀
@@ -69,7 +69,7 @@ Kami memiliki beberapa ide untuk pengembangan BIOTA di masa depan:
 * **Backend & Sinkronisasi Data:** Pengembangan server backend untuk database terpusat, mendukung skalabilitas dan sinkronisasi data antar perangkat.
 * **Fitur Komunitas yang Lebih Kuat:** Menambahkan forum diskusi, grup tematik, atau sistem pesan antar pengguna.
 * **Notifikasi Real-time:** Notifikasi push untuk update status laporan, event baru, atau berita konservasi penting.
-* **Optimasi Peta Lanjut:** Peningkatan performa pemuatan dan rendering peta untuk data yang sangat besar (misalnya dengan *marker clustering*).
+* **Optimasi Peta Lanjut:** Peningkatan performa pemuatan dan rendering peta untuk data yang sangat besar.
 
 ## Tim Pengembang 🧑‍💻👩‍💻
 
@@ -84,7 +84,7 @@ Proyek ini adalah hasil kerja keras dan kolaborasi dari Kelompok 8:
 
 ## Lisensi 📄
 
-Proyek ini dilisensikan di bawah [Nama Lisensi Anda, misalnya: MIT License]. Lihat file [LICENSE](LICENSE) untuk detail lebih lanjut. ## Ucapan Terima Kasih 🙏
+Proyek ini dilisensikan di bawah. Lihat file [LICENSE](LICENSE) untuk detail lebih lanjut. ## Ucapan Terima Kasih 🙏
 
 Kami mengucapkan terima kasih kepada:
 * Universitas Pembangunan Nasional "Veteran" Jawa Timur atas fasilitas dan kesempatan yang diberikan.
