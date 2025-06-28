@@ -5,7 +5,6 @@
 [![Framework](https://img.shields.io/badge/Framework-Flutter-02569B?logo=flutter)](https://flutter.dev/)
 [![Language](https://img.shields.io/badge/Language-Dart-0175C2?logo=dart)](https://dart.dev/)
 [![Database](https://img.shields.io/badge/Database-SQLite-003B57?logo=sqlite)](https://www.sqlite.org/index.html)
-[![License](https://img.shields.io/github/license/NemesisID/BIOTA---Flutter-v1.0.0)](https://github.com/NemesisID/BIOTA---Flutter-v1.0.0/blob/main/LICENSE)
 
 ## Tentang Proyek 🌿
 
